@@ -1,0 +1,38 @@
+<resources>
+    <string name="app_name">Camara</string>
+
+    <string name="mode_photo">Photo</string>
+    <string name="mode_video">Video</string>
+    <string name="mode_portrait">Portrait</string>
+    <string name="mode_night">Night</string>
+    <string name="mode_hdr">HDR</string>
+
+    <string name="action_shutter">Capture</string>
+    <string name="action_record">Record</string>
+    <string name="action_flip">Switch camera</string>
+    <string name="action_flash">Flash</string>
+    <string name="action_timer">Timer</string>
+    <string name="action_grid">Grid</string>
+    <string name="action_gallery">Gallery</string>
+    <string name="action_filters">Filters</string>
+    <string name="action_stickers">Stickers</string>
+    <string name="action_beauty">Beauty</string>
+    <string name="action_teleprompter">Teleprompter</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_save">Save</string>
+    <string name="action_share">Share</string>
+    <string name="action_crop">Crop</string>
+    <string name="action_rotate">Rotate</string>
+    <string name="action_adjust">Adjust</string>
+    <string name="action_text">Text</string>
+    <string name="action_draw">Draw</string>
+    <string name="action_frame">Frame</string>
+    <string name="action_trim">Trim</string>
+    <string name="action_speed">Speed</string>
+    <string name="action_export">Export</string>
+
+    <string name="permission_camera_rationale">Camara needs camera access to take photos and videos.</string>
+    <string name="permission_audio_rationale">Camara needs microphone access to record video with sound.</string>
+    <string name="permission_grant">Grant permission</string>
+</resources>
