@@ -70,7 +70,7 @@ fun TeleprompterScreen(onBack: () -> Unit) {
 
     LaunchedEffect(playing, speed) {
         while (playing) {
-            scroll.scrollBy(speed * 2f)
+            scroll.scrollTo(scroll.value + (speed * 2f).toInt())
             delay(16)
         }
     }

@@ -11,6 +11,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import com.camara.app.filters.ColorMatrixMath
+import com.camara.app.stickers.PlacedSticker
 import com.camara.app.util.BitmapUtils
 import kotlin.math.max
 import kotlin.math.min
