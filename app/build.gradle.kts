@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.camara.app"
-    compileSdk = 34
+    // Media3 1.10+ requires compiling against API 36.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.camara.app"
