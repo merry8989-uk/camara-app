@@ -327,7 +327,7 @@ private fun CameraContent(
             when (panel) {
                 CameraPanel.FILTERS -> FilterStrip(
                     selected = controller.filter,
-                    onSelect = { controller.setFilter(it) },
+                    onSelect = { controller.applyFilter(it) },
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 CameraPanel.STICKERS -> StickerPanel(
@@ -342,12 +342,12 @@ private fun CameraContent(
                 )
                 CameraPanel.BEAUTY -> BeautyPanel(
                     settings = controller.beauty,
-                    onChange = { controller.setBeauty(it) }
+                    onChange = { controller.applyBeauty(it) }
                 )
                 CameraPanel.LENSES -> Column {
                     LensPicker(
                         selected = controller.lens,
-                        onSelect = { controller.setLens(it) },
+                        onSelect = { controller.applyLens(it) },
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                     if (!controller.lensesSupported) {
@@ -384,7 +384,7 @@ private fun CameraContent(
                         PillButton(
                             text = m.label,
                             selected = controller.mode == m,
-                            onClick = { controller.setMode(m) }
+                            onClick = { controller.applyMode(m) }
                         )
                     }
                 }
@@ -408,7 +408,7 @@ private fun CameraContent(
                         PillButton(
                             text = ext.label,
                             selected = controller.extension == ext,
-                            onClick = { controller.setExtension(ext) }
+                            onClick = { controller.applyExtension(ext) }
                         )
                     }
                 }

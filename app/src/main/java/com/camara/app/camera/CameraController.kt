@@ -170,7 +170,9 @@ class CameraController(private val context: Context) {
         }
     }
 
-    fun setMode(newMode: CaptureMode) {
+    // Note: names are deliberately not setX() — the mutableStateOf properties above
+    // already generate JVM setX() setters, which would clash.
+    fun applyMode(newMode: CaptureMode) {
         if (mode == newMode) return
         if (isRecording) stopRecording()
         mode = newMode
@@ -203,20 +205,20 @@ class CameraController(private val context: Context) {
 
     fun toggleGrid() { showGrid = !showGrid }
 
-    fun setFilter(newFilter: Filter) {
+    fun applyFilter(newFilter: Filter) {
         filter = newFilter
         previewView?.let { LiveFilterEffect.apply(it, newFilter) }
     }
 
-    fun setBeauty(settings: BeautySettings) { beauty = settings }
+    fun applyBeauty(settings: BeautySettings) { beauty = settings }
 
-    fun setLens(newLens: Lens) {
+    fun applyLens(newLens: Lens) {
         lens = newLens
         lensesEnabled = newLens.art.isNotEmpty()
         if (!lensesEnabled) faceState = null
     }
 
-    fun setExtension(ext: CamaraExtension) {
+    fun applyExtension(ext: CamaraExtension) {
         if (extension == ext) return
         extension = ext
         rebind()
