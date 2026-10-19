@@ -38,6 +38,11 @@ jobs:
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
           "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
+      # The Gradle wrapper is committed via the GitHub API, which does not carry
+      # the executable bit, so set it before invoking the wrapper.
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
