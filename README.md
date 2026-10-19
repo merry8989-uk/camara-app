@@ -1,8 +1,8 @@
 # Camara 📸
 
 **An open-source, all-in-one camera and editing app for Android.**
-Shoot, filter, beautify, add stickers, read from a teleprompter, then edit photos and
-videos — all in one app, built with Kotlin, Jetpack Compose and CameraX.
+Shoot, filter, beautify, try on AR lenses, add stickers, read from a teleprompter,
+then edit photos and videos — all in one app, built with Kotlin, Jetpack Compose and CameraX.
 
 > **Note on the name.** "Camara" is an original app. It is *not* a copy of, and contains
 > no code from, B612, Snapchat, Instagram, Facebook or Meta's editing tools. It is an
@@ -21,6 +21,15 @@ videos — all in one app, built with Kotlin, Jetpack Compose and CameraX.
 - Rule-of-thirds grid overlay
 - **Camera extensions**: Auto, Portrait (bokeh), HDR, Night and Face Retouch — used
   automatically when the device/OEM supports them, with a safe fallback when not
+
+### AR lenses
+- **On-device face detection** (ML Kit) driving masks anchored to the face box and landmarks
+- **15 built-in lenses** — hand-drawn pieces (shades, cat ears, moustache, blush, crown)
+  mixed with emoji accents (flower crown, party, hearts, bunny, puppy, angel, on-fire…)
+- Masks track position, scale and head roll, and are mirrored correctly on the selfie camera
+- Lenses are **baked into the captured photo**, so the saved shot matches the preview
+- Gracefully disables itself on devices that can't bind face analysis alongside all other
+  camera use cases
 
 ### Filters
 - **40+ built-in looks** across families: Classic, Warm, Cool, Mono, Cinematic, Snap-style
@@ -45,7 +54,8 @@ videos — all in one app, built with Kotlin, Jetpack Compose and CameraX.
 - Optional **mirror mode** for beam-splitter rigs
 
 ### Image editor
-- Crop to aspect (Free, 1:1, 4:5, 3:4, 16:9, 9:16)
+- **Freeform drag-crop** — drag corners and edges, move the frame, or lock to 1:1, 4:5,
+  3:4, 16:9 and 9:16
 - Rotate 90° and flip H/V
 - Manual adjust: brightness, contrast, saturation, warmth
 - Filters, stickers, **text overlays** (drag / scale / rotate) and **freehand drawing**
@@ -54,8 +64,15 @@ videos — all in one app, built with Kotlin, Jetpack Compose and CameraX.
 
 ### Video editor
 - Frame-accurate **trim** with a range slider
+- **Speed control** — 0.5x to 3x slow-motion and fast-forward, with live preview and a
+  live estimate of the resulting clip length (Media3 `SpeedProvider`)
 - Apply any filter to video via Media3 `RgbMatrix`
 - Export to H.264 MP4 with a live progress indicator
+
+### Sharing
+- Share from the image editor, the video editor or any gallery tile
+- Uses the system share sheet (`ACTION_SEND`) so any installed app can receive it
+- Exports are written to the shared gallery first, then handed over with a read grant
 
 ### Gallery
 - Grid of captured photos and videos from the shared media store
@@ -71,7 +88,8 @@ videos — all in one app, built with Kotlin, Jetpack Compose and CameraX.
 | UI | Jetpack Compose (Material 3) |
 | Camera | CameraX (core, camera2, lifecycle, view, video, extensions, effects) |
 | Navigation | Navigation Compose |
-| Video | Media3 (ExoPlayer, Transformer, Effect) |
+| Video | Media3 1.11 (ExoPlayer, Transformer, Effect) |
+| Face / AR | ML Kit face detection |
 | Colour pipeline | Custom 4×5 colour-matrix engine + `RenderEffect` / `RgbMatrix` |
 | Min / target SDK | 24 / 34 |
 | Build | Gradle 8.7, AGP 8.5.2, Kotlin 2.0.20 |
@@ -155,14 +173,15 @@ That single matrix is reused everywhere:
 
 ## 🗺️ Roadmap
 
+- [x] Freeform (drag-handle) crop
+- [x] Video speed effects
+- [x] AR face-tracking masks and lenses
+- [x] Share sheet
 - [ ] Non-destructive edit history with undo/redo
-- [ ] Freeform (drag-handle) crop
-- [ ] Video speed and reverse effects
-- [ ] Video text/sticker overlays and transitions
-- [ ] AR face-tracking masks and lenses
-- [ ] Live filter on the recorded video stream (not just the preview)
+- [ ] Video reverse effects, text/sticker overlays and transitions
+- [ ] Live filter + lens applied to the *recorded* video stream (not just the preview)
 - [ ] Custom filter creation and user presets
-- [ ] Save/share sheet and direct social export
+- [ ] Direct share targets for specific social apps
 
 ---
 

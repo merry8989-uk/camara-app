@@ -12,8 +12,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         vectorDrawables { useSupportLibrary = true }
     }
@@ -44,7 +44,7 @@ android {
 
 dependencies {
     val camerax = "1.3.4"
-    val media3 = "1.4.1"
+    val media3 = "1.11.1"
 
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
     implementation(composeBom)
@@ -80,8 +80,10 @@ dependencies {
     implementation("androidx.media3:media3-common:$media3")
     implementation("androidx.media3:media3-ui:$media3")
 
-    // Image loading
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    // On-device face detection for AR lenses
+    implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // EXIF orientation handling
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     // Coroutines

@@ -5,18 +5,23 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -58,11 +64,14 @@ import com.camara.app.filters.FilterPresets
 import com.camara.app.ui.components.FilterStrip
 import com.camara.app.ui.theme.Accent
 import com.camara.app.util.MediaStoreUtils
+import com.camara.app.util.ShareUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+
+private val SPEED_OPTIONS = listOf(0.5f, 0.75f, 1f, 1.5f, 2f, 3f)
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -81,6 +90,7 @@ fun VideoEditorScreen(
     var durationMs by remember { mutableFloatStateOf(0f) }
     var range by remember { mutableStateOf(0f..0f) }
     var filter by remember { mutableStateOf<Filter>(FilterPresets.NONE) }
+    var speed by remember { mutableFloatStateOf(1f) }
     var exporting by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var transformerRef by remember { mutableStateOf<Transformer?>(null) }
@@ -104,6 +114,11 @@ fun VideoEditorScreen(
         exo.prepare()
     }
 
+    // Preview the chosen speed live.
+    LaunchedEffect(speed) {
+        exo.setPlaybackSpeed(speed)
+    }
+
     LaunchedEffect(exporting) {
         while (exporting) {
             transformerRef?.let { t ->
@@ -116,7 +131,7 @@ fun VideoEditorScreen(
         }
     }
 
-    fun export() {
+    fun export(shareAfter: Boolean) {
         val uri = sourceUri ?: return
         exporting = true
         progress = 0f
@@ -137,33 +152,40 @@ fun VideoEditorScreen(
             )
             .build()
 
-        val edited = EditedMediaItem.Builder(mediaItem)
+        val builder = EditedMediaItem.Builder(mediaItem)
             .setEffects(Effects(emptyList(), VideoEffects.forFilter(filter)))
-            .build()
+        if (speed != 1f) {
+            builder.setSpeed(VideoEffects.speedProvider(speed))
+            // Cap the output frame rate so fast-forward exports don't balloon.
+            if (speed > 1f) builder.setFrameRate(30)
+        }
+        val edited = builder.build()
 
         val transformer = Transformer.Builder(context)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
             .addListener(object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                     scope.launch {
-                        val ok = withContext(Dispatchers.IO) {
+                        val saved = withContext(Dispatchers.IO) {
                             try {
                                 val dest = MediaStoreUtils.createExportVideoUri(context)
                                 context.contentResolver.openOutputStream(dest)?.use { out ->
                                     output.inputStream().use { it.copyTo(out) }
                                 }
-                                true
+                                dest
                             } catch (t: Throwable) {
-                                false
+                                null
                             }
                         }
                         exporting = false
                         Toast.makeText(
                             context,
-                            if (ok) "Saved to gallery" else "Export failed",
+                            if (saved != null) "Saved to gallery" else "Export failed",
                             Toast.LENGTH_SHORT
                         ).show()
-                        if (ok) onBack()
+                        if (saved != null) {
+                            if (shareAfter) ShareUtils.shareMedia(context, saved, "video/mp4") else onBack()
+                        }
                     }
                 }
 
@@ -204,7 +226,10 @@ fun VideoEditorScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
             )
-            TextButton(onClick = { export() }, enabled = !exporting && sourceUri != null) {
+            IconButton(onClick = { export(shareAfter = true) }, enabled = !exporting && sourceUri != null) {
+                Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White)
+            }
+            TextButton(onClick = { export(shareAfter = false) }, enabled = !exporting && sourceUri != null) {
                 Text(if (exporting) "Exporting…" else "Export", color = Accent, fontWeight = FontWeight.SemiBold)
             }
         }
@@ -238,7 +263,7 @@ fun VideoEditorScreen(
         }
 
         // Trim
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.ContentCut, contentDescription = null, tint = Color.White.copy(alpha = 0.8f))
                 Text(
@@ -263,12 +288,52 @@ fun VideoEditorScreen(
             }
         }
 
+        // Speed
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Speed, contentDescription = null, tint = Color.White.copy(alpha = 0.8f))
+                Text(
+                    "Speed",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (durationMs > 0f) "Output ${fmt(range.let { (it.endInclusive - it.start) } / speed)}" else "",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 12.sp
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SPEED_OPTIONS.forEach { option ->
+                    val selected = kotlin.math.abs(option - speed) < 0.001f
+                    Text(
+                        text = "${trimZeros(option)}x",
+                        color = if (selected) Color.White else Color.White.copy(alpha = 0.65f),
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (selected) Accent else Color.White.copy(alpha = 0.08f))
+                            .clickable { speed = option }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
         // Filters
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(bottom = 8.dp)
+                .padding(top = 6.dp, bottom = 8.dp)
         ) {
             FilterStrip(selected = filter, onSelect = { filter = it })
         }
@@ -276,8 +341,11 @@ fun VideoEditorScreen(
 }
 
 private fun fmt(ms: Float): String {
-    val totalSeconds = (ms / 1000f).toInt()
+    val totalSeconds = (ms / 1000f).toInt().coerceAtLeast(0)
     val m = totalSeconds / 60
     val s = totalSeconds % 60
     return "%d:%02d".format(m, s)
 }
+
+private fun trimZeros(v: Float): String =
+    if (v == v.toInt().toFloat()) v.toInt().toString() else v.toString()

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FaceRetouchingNatural
 import androidx.compose.material.icons.filled.FlashAuto
 import androidx.compose.material.icons.filled.FlashOff
@@ -64,6 +66,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.camara.app.beauty.BeautyRenderer
 import com.camara.app.filters.FilterRenderer
+import com.camara.app.lenses.LensOverlay
+import com.camara.app.lenses.LensPicker
+import com.camara.app.lenses.LensRenderer
+import com.camara.app.lenses.NoFaceHint
 import com.camara.app.stickers.PlacedSticker
 import com.camara.app.stickers.StickerLayer
 import com.camara.app.stickers.StickerRenderer
@@ -82,7 +88,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class CameraPanel { NONE, FILTERS, STICKERS, BEAUTY }
+private enum class CameraPanel { NONE, FILTERS, STICKERS, BEAUTY, LENSES }
 
 @Composable
 fun CameraScreen(
@@ -151,6 +157,11 @@ private fun CameraContent(
                 if (!controller.beauty.isDefault) out = BeautyRenderer.apply(out, controller.beauty)
                 out = FilterRenderer.apply(out, controller.filter)
                 out = StickerRenderer.bake(out, capturedStickers)
+                val lensNow = controller.lens
+                val faceNow = controller.faceState
+                if (lensNow != null && lensNow.art.isNotEmpty() && faceNow != null) {
+                    out = LensRenderer.bake(out, lensNow, faceNow)
+                }
                 MediaStoreUtils.writeImage(context, uri, BitmapUtils.toJpegBytes(out))
             }
             withContext(Dispatchers.Main) { onEditPhoto(uri) }
@@ -196,6 +207,14 @@ private fun CameraContent(
                         controller.setZoomRatio(controller.zoom * zoomChange)
                     }
                 }
+        )
+
+        // --- AR lens overlay (under stickers) ---
+        LensOverlay(
+            lens = controller.lens,
+            face = controller.faceState,
+            mirrored = controller.lensFacing == CameraSelector.LENS_FACING_FRONT,
+            modifier = Modifier.fillMaxSize()
         )
 
         // --- Sticker overlay ---
@@ -290,6 +309,12 @@ private fun CameraContent(
                 selected = panel == CameraPanel.BEAUTY,
                 onClick = { panel = if (panel == CameraPanel.BEAUTY) CameraPanel.NONE else CameraPanel.BEAUTY }
             )
+            CircleIconButton(
+                icon = Icons.Filled.Face,
+                contentDescription = "Lenses",
+                selected = panel == CameraPanel.LENSES,
+                onClick = { panel = if (panel == CameraPanel.LENSES) CameraPanel.NONE else CameraPanel.LENSES }
+            )
         }
 
         // --- Bottom stack: mode strip, extension strip, filter strip, controls ---
@@ -319,6 +344,25 @@ private fun CameraContent(
                     settings = controller.beauty,
                     onChange = { controller.setBeauty(it) }
                 )
+                CameraPanel.LENSES -> Column {
+                    LensPicker(
+                        selected = controller.lens,
+                        onSelect = { controller.setLens(it) },
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    if (!controller.lensesSupported) {
+                        Text(
+                            "Face lenses aren't supported alongside all camera modes on this device.",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    } else if (controller.lensesEnabled && controller.faceState == null) {
+                        NoFaceHint(
+                            Modifier.padding(start = 16.dp, top = 2.dp, bottom = 6.dp)
+                        )
+                    }
+                }
                 CameraPanel.NONE -> Unit
             }
 

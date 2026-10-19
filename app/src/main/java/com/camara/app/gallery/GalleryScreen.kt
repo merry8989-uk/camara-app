@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.camara.app.util.Permissions
+import com.camara.app.util.ShareUtils
 import com.camara.app.util.ThumbnailLoader
 
 @Composable
@@ -168,6 +170,24 @@ private fun GalleryTile(entry: MediaEntry, onClick: () -> Unit) {
                     .padding(4.dp)
             )
         }
+        Icon(
+            imageVector = Icons.Filled.Share,
+            contentDescription = "Share",
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(Color(0x99000000))
+                .clickable {
+                    ShareUtils.shareMedia(
+                        context,
+                        entry.uri,
+                        if (entry.isVideo) "video/mp4" else "image/jpeg"
+                    )
+                }
+                .padding(4.dp)
+        )
     }
 }
 

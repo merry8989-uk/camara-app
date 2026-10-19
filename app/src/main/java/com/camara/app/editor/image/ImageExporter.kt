@@ -24,7 +24,7 @@ object ImageExporter {
         if (edit.rotationDeg != 0f) bmp = BitmapUtils.rotate(bmp, edit.rotationDeg)
         if (edit.flipH) bmp = BitmapUtils.flip(bmp, true)
         if (edit.flipV) bmp = BitmapUtils.flip(bmp, false)
-        edit.cropAspect?.let { bmp = centerCrop(bmp, it) }
+        if (edit.crop != CropRect.FULL) bmp = cropTo(bmp, edit.crop)
 
         // 2. Colour: filter composed over manual adjustments.
         val needsColor = !edit.filter.isIdentity || !edit.adjustments.isDefault
@@ -52,19 +52,13 @@ object ImageExporter {
         return out
     }
 
-    fun centerCrop(src: Bitmap, aspect: Float): Bitmap {
-        val w = src.width
-        val h = src.height
-        val current = w.toFloat() / h
-        return if (current > aspect) {
-            val newW = (h * aspect).toInt().coerceAtLeast(1)
-            val x = (w - newW) / 2
-            Bitmap.createBitmap(src, x, 0, newW, h)
-        } else {
-            val newH = (w / aspect).toInt().coerceAtLeast(1)
-            val y = (h - newH) / 2
-            Bitmap.createBitmap(src, 0, y, w, newH)
-        }
+    /** Cuts [src] to the normalised [rect]. */
+    fun cropTo(src: Bitmap, rect: CropRect): Bitmap {
+        val x = (rect.left * src.width).toInt().coerceIn(0, src.width - 1)
+        val y = (rect.top * src.height).toInt().coerceIn(0, src.height - 1)
+        val w = (rect.width * src.width).toInt().coerceIn(1, src.width - x)
+        val h = (rect.height * src.height).toInt().coerceIn(1, src.height - y)
+        return Bitmap.createBitmap(src, x, y, w, h)
     }
 
     private fun drawStrokes(canvas: Canvas, out: Bitmap, strokes: List<DrawStroke>) {

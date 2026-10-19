@@ -1,12 +1,14 @@
 package com.camara.app.editor.video
 
+import androidx.media3.common.C
 import androidx.media3.common.Effect
+import androidx.media3.common.audio.SpeedProvider
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.RgbMatrix
 import com.camara.app.filters.Filter
 
 /**
- * Bridges a colour-matrix [Filter] into Media3 video effects.
+ * Bridges Camara's colour-matrix filters and speed control into Media3 effects.
  *
  * Media3's [RgbMatrix] wants a 4x4 matrix in column-major order, so we take the
  * linear (non-offset) part of our 4x5 matrix and transpose it.
@@ -27,5 +29,11 @@ object VideoEffects {
             effects.add(RgbMatrix { _, _ -> matrix4x4 })
         }
         return effects
+    }
+
+    /** A constant-rate speed provider (1.0 = unchanged). */
+    fun speedProvider(speed: Float): SpeedProvider = object : SpeedProvider {
+        override fun getSpeed(timeUs: Long): Float = speed
+        override fun getNextSpeedChangeTimeUs(timeUs: Long): Long = C.TIME_UNSET
     }
 }

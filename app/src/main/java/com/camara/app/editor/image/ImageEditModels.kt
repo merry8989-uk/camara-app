@@ -27,6 +27,33 @@ data class TextItem(
     val sizeFraction: Float = 0.09f
 )
 
+/** A normalised crop rectangle over the (rotated, flipped) image. */
+data class CropRect(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float
+) {
+    val width: Float get() = right - left
+    val height: Float get() = bottom - top
+
+    companion object {
+        val FULL = CropRect(0f, 0f, 1f, 1f)
+
+        /** Largest centred rect of the given width/height [aspect] inside the frame. */
+        fun centered(aspect: Float): CropRect {
+            if (aspect <= 0f) return FULL
+            return if (aspect >= 1f) {
+                val h = 1f / aspect
+                CropRect(0f, (1f - h) / 2f, 1f, (1f + h) / 2f)
+            } else {
+                val w = aspect
+                CropRect((1f - w) / 2f, 0f, (1f + w) / 2f, 1f)
+            }
+        }
+    }
+}
+
 /** Photo frame styles that are baked on export. */
 enum class FrameStyle(val label: String) {
     NONE("None"),
@@ -56,12 +83,13 @@ data class Adjustments(
     companion object { val DEFAULT = Adjustments() }
 }
 
-/** The complete, serialisable description of an edit session. */
+/** The complete description of an edit session. */
 data class ImageEditState(
     val rotationDeg: Float = 0f,
     val flipH: Boolean = false,
     val flipV: Boolean = false,
-    val cropAspect: Float? = null, // width / height, null = original
+    val crop: CropRect = CropRect.FULL,
+    val cropAspectLock: Float? = null,
     val filter: Filter = FilterPresets.NONE,
     val adjustments: Adjustments = Adjustments.DEFAULT,
     val stickers: List<PlacedSticker> = emptyList(),
@@ -70,7 +98,7 @@ data class ImageEditState(
     val frame: FrameStyle = FrameStyle.NONE
 ) {
     val hasEdits: Boolean
-        get() = rotationDeg != 0f || flipH || flipV || cropAspect != null ||
+        get() = rotationDeg != 0f || flipH || flipV || crop != CropRect.FULL ||
             !filter.isIdentity || !adjustments.isDefault ||
             stickers.isNotEmpty() || texts.isNotEmpty() ||
             strokes.isNotEmpty() || frame != FrameStyle.NONE

@@ -8,6 +8,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -34,11 +35,19 @@ import com.camara.app.beauty.BeautySettings
 import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterPresets
 import com.camara.app.filters.LiveFilterEffect
+import com.camara.app.lenses.FaceAnalyzer
+import com.camara.app.lenses.FaceState
+import com.camara.app.lenses.Lens
+import com.camara.app.lenses.LensCatalog
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 /**
  * Wraps CameraX: owns the use cases, exposes Compose-observable state, and
- * handles photo/video capture. One instance per camera screen.
+ * handles photo/video capture plus AR face detection. One instance per screen.
+ *
+ * Face detection runs on a private single-thread executor; results are posted back
+ * to the main thread before touching Compose state.
  */
 class CameraController(private val context: Context) {
 
@@ -55,15 +64,23 @@ class CameraController(private val context: Context) {
     var extension by mutableStateOf(CamaraExtension.AUTO); private set
     var errorMessage by mutableStateOf<String?>(null); private set
 
+    // --- AR lenses ---
+    var lens by mutableStateOf<Lens?>(LensCatalog.NONE); private set
+    var faceState by mutableStateOf<FaceState?>(null); private set
+    var lensesEnabled by mutableStateOf(false); private set
+    var lensesSupported by mutableStateOf(true); private set
+
     private var provider: ProcessCameraProvider? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
+    private var imageAnalysis: ImageAnalysis? = null
     private var camera: Camera? = null
     private var recording: Recording? = null
     private var previewView: PreviewView? = null
     private var lifecycleOwner: LifecycleOwner? = null
 
     private val executor: Executor = ContextCompat.getMainExecutor(context)
+    private val analysisExecutor: Executor = Executors.newSingleThreadExecutor()
 
     fun attach(owner: LifecycleOwner, view: PreviewView) {
         lifecycleOwner = owner
@@ -108,11 +125,40 @@ class CameraController(private val context: Context) {
                 .build()
             val vc = VideoCapture.withOutput(recorder)
 
-            val useCases: Array<UseCase> = arrayOf(previewUseCase, ic, vc)
-            camera = p.bindToLifecycle(owner, selector, *useCases)
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+            analysis.setAnalyzer(analysisExecutor, FaceAnalyzer { face ->
+                // Hop to the main thread before writing Compose state.
+                executor.execute { if (lensesEnabled) faceState = face }
+            })
+
+            // Many devices cap the number of concurrent use cases. Try the full set
+            // first, then fall back to dropping face analysis.
+            val bound = try {
+                camera = p.bindToLifecycle(
+                    owner, selector, previewUseCase, ic, vc, analysis
+                )
+                lensesSupported = true
+                true
+            } catch (t: Throwable) {
+                try {
+                    camera = p.bindToLifecycle(owner, selector, previewUseCase, ic, vc)
+                    lensesSupported = false
+                    false
+                } catch (t2: Throwable) {
+                    errorMessage = t2.message ?: "Camera failed to bind"
+                    return
+                }
+            }
 
             imageCapture = ic
             videoCapture = vc
+            imageAnalysis = if (bound) analysis else null
+            if (!bound) {
+                analysis.clearAnalyzer()
+                faceState = null
+            }
 
             camera?.cameraInfo?.zoomState?.observe(owner) { state: ZoomState ->
                 maxZoom = state.maxZoomRatio
@@ -164,6 +210,12 @@ class CameraController(private val context: Context) {
 
     fun setBeauty(settings: BeautySettings) { beauty = settings }
 
+    fun setLens(newLens: Lens) {
+        lens = newLens
+        lensesEnabled = newLens.art.isNotEmpty()
+        if (!lensesEnabled) faceState = null
+    }
+
     fun setExtension(ext: CamaraExtension) {
         if (extension == ext) return
         extension = ext
@@ -182,7 +234,7 @@ class CameraController(private val context: Context) {
         }
     }
 
-    /** Captures a photo, bakes in the current filter + beauty, then reports the Uri. */
+    /** Captures a photo and reports the saved Uri (filter/beauty/lens applied by caller). */
     fun takePhoto(onSaved: (Uri) -> Unit) {
         val ic = imageCapture ?: return
         val values = ContentValues().apply {
@@ -250,7 +302,9 @@ class CameraController(private val context: Context) {
         } catch (_: Throwable) {
         }
         recording = null
+        imageAnalysis?.clearAnalyzer()
         provider?.unbindAll()
+        analysisExecutor.let { if (it is java.util.concurrent.ExecutorService) it.shutdown() }
     }
 
     private fun hasAudioPermission(): Boolean =

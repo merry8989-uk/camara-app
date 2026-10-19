@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.FilterFrames
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -74,6 +75,7 @@ import com.camara.app.ui.components.StickerPanel
 import com.camara.app.ui.theme.Accent
 import com.camara.app.util.BitmapUtils
 import com.camara.app.util.MediaStoreUtils
+import com.camara.app.util.ShareUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -115,14 +117,16 @@ fun ImageEditorScreen(
         }
     }
 
-    // Geometry-only preview (colour is applied via a Compose ColorFilter below).
-    val previewBitmap: Bitmap? = remember(previewSource, edit.rotationDeg, edit.flipH, edit.flipV, edit.cropAspect) {
+    val cropping = tool == EditorTool.CROP
+    // Geometry preview (colour is applied via a Compose ColorFilter below). While the
+    // crop tool is active we show the whole frame so the handles make sense.
+    val previewBitmap: Bitmap? = remember(previewSource, edit.rotationDeg, edit.flipH, edit.flipV, edit.crop, cropping) {
         previewSource?.let { src ->
             var b = src
             if (edit.rotationDeg != 0f) b = BitmapUtils.rotate(b, edit.rotationDeg)
             if (edit.flipH) b = BitmapUtils.flip(b, true)
             if (edit.flipV) b = BitmapUtils.flip(b, false)
-            edit.cropAspect?.let { b = ImageExporter.centerCrop(b, it) }
+            if (!cropping && edit.crop != CropRect.FULL) b = ImageExporter.cropTo(b, edit.crop)
             b
         }
     }
@@ -132,30 +136,34 @@ fun ImageEditorScreen(
     }
     val needsColor = !edit.filter.isIdentity || !edit.adjustments.isDefault
 
-    fun save() {
+    fun exportToGallery(onDone: (Uri?) -> Unit) {
         val b = base ?: return
         saving = true
         scope.launch {
-            val ok = withContext(Dispatchers.IO) {
+            val uri = withContext(Dispatchers.IO) {
                 try {
                     val out = ImageExporter.render(b, edit)
                     val bytes = BitmapUtils.toJpegBytes(out)
-                    val uri = MediaStoreUtils.createExportImageUri(context, "edited")
-                    MediaStoreUtils.writeImage(context, uri, bytes)
-                    true
+                    val u = MediaStoreUtils.createExportImageUri(context, "edited")
+                    MediaStoreUtils.writeImage(context, u, bytes)
+                    u
                 } catch (t: Throwable) {
-                    false
+                    null
                 }
             }
             saving = false
             Toast.makeText(
                 context,
-                if (ok) "Saved to gallery" else "Save failed",
+                if (uri != null) "Saved to gallery" else "Save failed",
                 Toast.LENGTH_SHORT
             ).show()
-            if (ok) onBack()
+            onDone(uri)
         }
     }
+
+    fun save() = exportToGallery { if (it != null) onBack() }
+
+    fun share() = exportToGallery { if (it != null) ShareUtils.shareMedia(context, it, "image/jpeg") }
 
     Column(
         modifier = Modifier
@@ -176,6 +184,9 @@ fun ImageEditorScreen(
             Spacer(Modifier.weight(1f))
             IconButton(onClick = { edit = ImageEditState() }) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Reset", tint = Color.White.copy(alpha = 0.7f))
+            }
+            IconButton(onClick = { share() }, enabled = !saving && base != null) {
+                Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White)
             }
             TextButton(onClick = { save() }, enabled = !saving && base != null) {
                 Icon(Icons.Filled.Check, contentDescription = null, tint = Accent)
@@ -233,6 +244,14 @@ fun ImageEditorScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                         FrameOverlay(edit.frame, Modifier.fillMaxSize())
+                        if (cropping) {
+                            CropOverlay(
+                                crop = edit.crop,
+                                aspectLock = edit.cropAspectLock,
+                                onCropChange = { edit = edit.copy(crop = it) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             } else {
@@ -249,7 +268,12 @@ fun ImageEditorScreen(
         ) {
             when (tool) {
                 EditorTool.NONE -> Unit
-                EditorTool.CROP -> CropPanel(edit.cropAspect) { edit = edit.copy(cropAspect = it) }
+                EditorTool.CROP -> CropPanel(edit.cropAspectLock) { aspect ->
+                    edit = edit.copy(
+                        crop = if (aspect == null) CropRect.FULL else CropRect.centered(aspect),
+                        cropAspectLock = aspect
+                    )
+                }
                 EditorTool.ROTATE -> RotatePanel(
                     onRotate = { edit = edit.copy(rotationDeg = (edit.rotationDeg + 90f) % 360f) },
                     onFlipH = { edit = edit.copy(flipH = !edit.flipH) },
