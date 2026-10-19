@@ -71,7 +71,6 @@ dependencies {
     implementation("androidx.camera:camera-view:$camerax")
     implementation("androidx.camera:camera-video:$camerax")
     implementation("androidx.camera:camera-extensions:$camerax")
-    implementation("androidx.camera:camera-effects:$camerax")
 
     // Media3 — video playback, editing and export
     implementation("androidx.media3:media3-exoplayer:$media3")
