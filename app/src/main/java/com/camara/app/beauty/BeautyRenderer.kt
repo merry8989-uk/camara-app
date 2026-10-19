@@ -25,13 +25,8 @@ object BeautyRenderer {
         var bmp = src
 
         // 1. Colour grade (brightness / warmth / skin tone).
-        val grade = ColorMatrixMath.chain(
-            ColorMatrixMath.saturation(1f + settings.skinTone * 0.08f),
-            ColorMatrixMath.brightness(settings.brighten * 0.25f),
-            ColorMatrixMath.temperature(settings.warmth)
-        )
-        if (settings.brighten != 0f || settings.warmth != 0f || settings.skinTone != 0f) {
-            bmp = applyMatrix(bmp, grade)
+        if (settings.hasGrade) {
+            bmp = applyMatrix(bmp, settings.gradeMatrix())
         }
 
         // 2. Skin smoothing: blend the image with a blurred copy.

@@ -21,10 +21,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -73,6 +73,7 @@ import com.camara.app.lenses.NoFaceHint
 import com.camara.app.stickers.PlacedSticker
 import com.camara.app.stickers.StickerLayer
 import com.camara.app.stickers.StickerRenderer
+import com.camara.app.teleprompter.TeleprompterOverlay
 import com.camara.app.ui.components.BeautyPanel
 import com.camara.app.ui.components.CircleIconButton
 import com.camara.app.ui.components.FilterStrip
@@ -136,13 +137,19 @@ private fun CameraContent(
 
     val controller = remember { CameraController(context) }
     val previewView = remember {
-        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            // TextureView-backed preview: required for live filter/beauty preview
+            // (RenderEffect does not affect a SurfaceView) and for reliable overlay
+            // compositing over the camera feed.
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
     }
 
     var panel by remember { mutableStateOf(CameraPanel.NONE) }
     var stickers by remember { mutableStateOf(listOf<PlacedSticker>()) }
     var countdown by remember { mutableIntStateOf(0) }
-    var lastPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var showTeleprompter by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         controller.attach(lifecycleOwner, previewView)
@@ -150,15 +157,19 @@ private fun CameraContent(
     }
 
     fun processAndOpenPhoto(uri: Uri, capturedStickers: List<PlacedSticker>) {
+        // Read Compose state on the main thread, then do the pixel work off it.
+        val filterNow = controller.filter
+        val beautyNow = controller.beauty
+        val lensNow = controller.lens
+        val faceNow = controller.faceState
+
         scope.launch {
             withContext(Dispatchers.IO) {
                 val bmp = BitmapUtils.decodeUri(context, uri) ?: return@withContext
                 var out = bmp
-                if (!controller.beauty.isDefault) out = BeautyRenderer.apply(out, controller.beauty)
-                out = FilterRenderer.apply(out, controller.filter)
+                if (!beautyNow.isDefault) out = BeautyRenderer.apply(out, beautyNow)
+                out = FilterRenderer.apply(out, filterNow)
                 out = StickerRenderer.bake(out, capturedStickers)
-                val lensNow = controller.lens
-                val faceNow = controller.faceState
                 if (lensNow != null && lensNow.art.isNotEmpty() && faceNow != null) {
                     out = LensRenderer.bake(out, lensNow, faceNow)
                 }
@@ -244,6 +255,18 @@ private fun CameraContent(
             }
         }
 
+        // --- Transparent teleprompter, over the preview ---
+        if (showTeleprompter) {
+            TeleprompterOverlay(
+                onEditScript = onOpenTeleprompter,
+                onClose = { showTeleprompter = false },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 60.dp)
+            )
+        }
+
         // --- Top bar ---
         Row(
             modifier = Modifier
@@ -278,7 +301,8 @@ private fun CameraContent(
                 CircleIconButton(
                     icon = Icons.Filled.Subtitles,
                     contentDescription = "Teleprompter",
-                    onClick = onOpenTeleprompter
+                    selected = showTeleprompter,
+                    onClick = { showTeleprompter = !showTeleprompter }
                 )
             }
         }
@@ -317,7 +341,7 @@ private fun CameraContent(
             )
         }
 
-        // --- Bottom stack: mode strip, extension strip, filter strip, controls ---
+        // --- Bottom stack ---
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -366,7 +390,6 @@ private fun CameraContent(
                 CameraPanel.NONE -> Unit
             }
 
-            // Mode strip
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -390,7 +413,6 @@ private fun CameraContent(
                 }
             }
 
-            // Extension strip
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -414,7 +436,6 @@ private fun CameraContent(
                 }
             }
 
-            // Zoom indicator
             Text(
                 text = "${"%.1f".format(controller.zoom)}x",
                 color = Color.White.copy(alpha = 0.8f),
@@ -424,7 +445,6 @@ private fun CameraContent(
                     .padding(bottom = 4.dp)
             )
 
-            // Main controls
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -432,7 +452,6 @@ private fun CameraContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Gallery thumbnail
                 Box(
                     modifier = Modifier
                         .size(48.dp)

@@ -34,8 +34,11 @@ then edit photos and videos — all in one app, built with Kotlin, Jetpack Compo
 ### Filters
 - **40+ built-in looks** across families: Classic, Warm, Cool, Mono, Cinematic, Snap-style
   and social-feed styles
-- Real-time live preview on Android 12+ (GPU `RenderEffect`) and baked into the saved file
-  so **what you see is what you get**
+- Real-time live preview on the camera on Android 12+ (GPU `RenderEffect`) and baked into
+  the saved file so **what you see is what you get**
+- The preview runs in `ImplementationMode.COMPATIBLE` (TextureView) because a SurfaceView
+  is composited as a separate layer and ignores `RenderEffect` — with the default
+  `PERFORMANCE` mode the live filter silently does nothing
 - One shared colour-matrix engine powers the camera preview, the image editor and the
   video exporter
 
@@ -45,13 +48,19 @@ then edit photos and videos — all in one app, built with Kotlin, Jetpack Compo
 - Baked into the exported photo at the right position, size and rotation
 
 ### Beauty / retouch
-- Skin smoothing, brighten, warmth, skin tone, sharpen
+- **Enhance face** — one-tap natural retouch preset
+- Smooth, brighten, warmth and skin tone **preview live on the camera**
 - **Face slimming** and **eye enlargement** via a real vertex-mesh warp
-  (`Canvas.drawBitmapMesh`), not a crop or scale
+  (`Canvas.drawBitmapMesh`), not a crop or scale; these are baked into the capture
+  (a mesh warp can't be expressed as a `RenderEffect`)
 
 ### Teleprompter
-- Paste or type a script, set speed and text size, hit play
-- Optional **mirror mode** for beam-splitter rigs
+- **Transparent, draggable overlay that sits on top of the camera preview**, so you can
+  read your script and watch yourself recording at the same time
+- Play/pause, speed, text size, **mirror mode** and panel **opacity**, adjustable from the
+  overlay itself; drag the handle to move it anywhere on screen
+- A full-screen editor for longer scripts — the script and settings are shared with the
+  overlay and persisted between sessions
 
 ### Image editor
 - **Freeform drag-crop** — drag corners and edges, move the frame, or lock to 1:1, 4:5,

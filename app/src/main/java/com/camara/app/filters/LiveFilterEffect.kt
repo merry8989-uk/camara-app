@@ -2,33 +2,65 @@ package com.camara.app.filters
 
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.os.Build
 import android.view.View
 import androidx.annotation.RequiresApi
+import com.camara.app.beauty.BeautySettings
 
 /**
- * Applies a live filter to a preview surface.
+ * Applies a live look to the camera preview.
  *
- * On Android 12+ (API 31) we use [RenderEffect] with a colour-matrix filter, which
- * runs on the GPU with no extra buffers — so the preview shows the filtered look at
- * full frame rate. Below API 31 the preview is unfiltered (the filter is still baked
- * into the captured photo, so nothing is lost).
+ * This is the piece that makes filters and beauty *visible while you shoot*. It
+ * combines the selected colour-matrix filter with the colour part of the beauty
+ * grade into one colour filter, and optionally chains a blur for skin smoothing,
+ * then applies the result to the preview view as a [RenderEffect].
+ *
+ * IMPORTANT: this only works when the preview is a TextureView, i.e. the
+ * [androidx.camera.view.PreviewView] must be created with
+ * `ImplementationMode.COMPATIBLE`. A SurfaceView (`PERFORMANCE`, the default) is
+ * composited as a separate layer and ignores RenderEffect entirely — which is why
+ * live filters previously appeared to do nothing.
+ *
+ * The spatial beauty steps (face slimming, eye enlargement, detail sharpen) cannot
+ * be expressed as a RenderEffect and are baked into the captured photo instead.
  */
 object LiveFilterEffect {
 
-    fun apply(view: View, filter: Filter?) {
+    fun apply(view: View, filter: Filter, beauty: BeautySettings) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            applyApi31(view, filter)
+            applyApi31(view, filter, beauty)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
-    private fun applyApi31(view: View, filter: Filter?) {
-        if (filter == null || filter.isIdentity) {
+    private fun applyApi31(view: View, filter: Filter, beauty: BeautySettings) {
+        val hasColour = !filter.isIdentity || beauty.hasGrade
+        val hasBlur = beauty.smooth > 0.01f
+
+        if (!hasColour && !hasBlur) {
             view.setRenderEffect(null)
-        } else {
-            val colorFilter = ColorMatrixColorFilter(filter.matrix)
-            view.setRenderEffect(RenderEffect.createColorFilterEffect(colorFilter))
+            return
         }
+
+        var effect: RenderEffect? = null
+
+        if (hasColour) {
+            val matrix = ColorMatrixMath.compose(filter.matrix, beauty.gradeMatrix())
+            effect = RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(matrix))
+        }
+
+        if (hasBlur) {
+            val radius = (beauty.smooth * 8f).coerceIn(0.5f, 12f)
+            val blur = RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
+            effect = if (effect != null) {
+                // Inner applied first: blur, then colour grade.
+                RenderEffect.createChainEffect(effect, blur)
+            } else {
+                blur
+            }
+        }
+
+        view.setRenderEffect(effect)
     }
 }

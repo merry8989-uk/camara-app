@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -30,7 +30,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,31 +46,22 @@ import com.camara.app.ui.theme.Accent
 import kotlinx.coroutines.delay
 
 /**
- * A teleprompter: paste a script, set speed and text size, then hit play and the
- * text scrolls for you to read while recording. Optional mirror mode flips the
- * text for beam-splitter glass rigs.
+ * Full-screen teleprompter editor. The script, speed, size and mirror settings are
+ * shared with the on-camera overlay via [TeleprompterStore], so edits here show up
+ * immediately in the overlay.
  */
 @Composable
 fun TeleprompterScreen(onBack: () -> Unit) {
-    var script by remember {
-        mutableStateOf(
-            "Paste your script here.\n\n" +
-                "Hit play and Camara scrolls the words at your pace. " +
-                "Adjust speed and text size below, or flip the text with mirror mode " +
-                "when you are using a teleprompter rig."
-        )
-    }
-    var speed by remember { mutableFloatStateOf(2.5f) }   // scroll units per tick
-    var fontSize by remember { mutableFloatStateOf(34f) }
-    var mirror by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { TeleprompterStore.load(context) }
+
     var playing by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(true) }
-
     val scroll = rememberScrollState()
 
-    LaunchedEffect(playing, speed) {
+    LaunchedEffect(playing, TeleprompterStore.speed) {
         while (playing) {
-            scroll.scrollTo(scroll.value + (speed * 2f).toInt())
+            scroll.scrollTo(scroll.value + (TeleprompterStore.speed * 2f).toInt())
             delay(16)
         }
     }
@@ -81,7 +72,6 @@ fun TeleprompterScreen(onBack: () -> Unit) {
             .background(Color(0xFF0B0B0F))
     ) {
         Column(Modifier.fillMaxSize()) {
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -89,31 +79,39 @@ fun TeleprompterScreen(onBack: () -> Unit) {
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(onClick = {
+                    TeleprompterStore.persist(context)
+                    onBack()
+                }) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
                 Text(
-                    "Teleprompter",
+                    "Teleprompter script",
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = { editing = !editing }) {
-                    Text(
-                        if (editing) "Done" else "Edit",
-                        color = Accent,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                Text(
+                    if (editing) "Preview" else "Edit",
+                    color = Accent,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            editing = !editing
+                            if (!editing) playing = false
+                            TeleprompterStore.persist(context)
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                )
             }
 
-            // Script area
             if (editing) {
                 OutlinedTextField(
-                    value = script,
-                    onValueChange = { script = it },
+                    value = TeleprompterStore.script,
+                    onValueChange = { TeleprompterStore.script = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -128,20 +126,19 @@ fun TeleprompterScreen(onBack: () -> Unit) {
                         .padding(horizontal = 20.dp)
                 ) {
                     Text(
-                        text = script,
+                        text = TeleprompterStore.script,
                         color = Color.White,
-                        fontSize = fontSize.sp,
+                        fontSize = TeleprompterStore.fontSize.sp,
                         fontWeight = FontWeight.Medium,
-                        lineHeight = (fontSize * 1.4f).sp,
+                        lineHeight = (TeleprompterStore.fontSize * 1.4f).sp,
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer { scaleX = if (mirror) -1f else 1f }
+                            .graphicsLayer { scaleX = if (TeleprompterStore.mirror) -1f else 1f }
                             .verticalScroll(scroll)
                     )
                 }
             }
 
-            // Controls
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -153,8 +150,8 @@ fun TeleprompterScreen(onBack: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Speed", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
                     Slider(
-                        value = speed,
-                        onValueChange = { speed = it },
+                        value = TeleprompterStore.speed,
+                        onValueChange = { TeleprompterStore.speed = it },
                         valueRange = 0.5f..8f,
                         modifier = Modifier.weight(1f)
                     )
@@ -162,9 +159,18 @@ fun TeleprompterScreen(onBack: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Text size", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
                     Slider(
-                        value = fontSize,
-                        onValueChange = { fontSize = it },
+                        value = TeleprompterStore.fontSize,
+                        onValueChange = { TeleprompterStore.fontSize = it },
                         valueRange = 18f..72f,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Opacity", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
+                    Slider(
+                        value = TeleprompterStore.opacity,
+                        onValueChange = { TeleprompterStore.opacity = it },
+                        valueRange = 0.2f..1f,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -175,16 +181,23 @@ fun TeleprompterScreen(onBack: () -> Unit) {
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Flip, contentDescription = "Mirror", tint = Color.White.copy(alpha = 0.8f))
-                        Spacer(Modifier.height(0.dp))
-                        Text("Mirror", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp, modifier = Modifier.padding(horizontal = 8.dp))
-                        Switch(checked = mirror, onCheckedChange = { mirror = it })
+                        Text(
+                            "Mirror",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                        Switch(
+                            checked = TeleprompterStore.mirror,
+                            onCheckedChange = { TeleprompterStore.mirror = it }
+                        )
                     }
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(24.dp))
                             .background(Accent)
-                            .padding(horizontal = 20.dp, vertical = 10.dp)
-                            .clickable { playing = !playing; editing = false },
+                            .clickable { playing = !playing; editing = false }
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -202,6 +215,12 @@ fun TeleprompterScreen(onBack: () -> Unit) {
                         }
                     }
                 }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "This script also appears on the camera screen as a transparent overlay.",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 11.sp
+                )
             }
         }
     }

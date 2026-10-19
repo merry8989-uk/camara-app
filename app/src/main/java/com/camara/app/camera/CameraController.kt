@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -43,11 +44,13 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 /**
- * Wraps CameraX: owns the use cases, exposes Compose-observable state, and
- * handles photo/video capture plus AR face detection. One instance per screen.
+ * Wraps CameraX: owns the use cases, exposes Compose-observable state, handles
+ * photo/video capture and AR face detection.
  *
- * Face detection runs on a private single-thread executor; results are posted back
- * to the main thread before touching Compose state.
+ * Only the use cases needed for the current mode are bound (Preview + ImageCapture
+ * *or* VideoCapture, plus ImageAnalysis only when a lens is active). Binding four
+ * use cases at once exceeds the guaranteed combination on many devices, which is
+ * why face lenses previously reported themselves as unsupported.
  */
 class CameraController(private val context: Context) {
 
@@ -106,13 +109,17 @@ class CameraController(private val context: Context) {
             val baseSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             val selector = CameraExtensionResolver.resolve(context, p, baseSelector, extension)
 
-            val previewUseCase = Preview.Builder().build().also {
-                it.setSurfaceProvider(view.surfaceProvider)
-            }
+            // Preview and analysis share the same aspect ratio so face coordinates
+            // map onto the preview consistently.
+            val previewUseCase = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .build()
+                .also { it.setSurfaceProvider(view.surfaceProvider) }
 
             val ic = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .setFlashMode(flashMode)
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                 .build()
 
             val recorder = Recorder.Builder()
@@ -125,7 +132,9 @@ class CameraController(private val context: Context) {
                 .build()
             val vc = VideoCapture.withOutput(recorder)
 
+            val wantsAnalysis = lens?.art?.isNotEmpty() == true
             val analysis = ImageAnalysis.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
             analysis.setAnalyzer(analysisExecutor, FaceAnalyzer { face ->
@@ -133,38 +142,39 @@ class CameraController(private val context: Context) {
                 executor.execute { if (lensesEnabled) faceState = face }
             })
 
-            // Many devices cap the number of concurrent use cases. Try the full set
-            // first, then fall back to dropping face analysis.
-            val bound = try {
-                camera = p.bindToLifecycle(
-                    owner, selector, previewUseCase, ic, vc, analysis
-                )
-                lensesSupported = true
-                true
+            val useCases = mutableListOf<UseCase>(previewUseCase)
+            when (mode) {
+                CaptureMode.PHOTO -> useCases += ic
+                CaptureMode.VIDEO -> useCases += vc
+            }
+            if (wantsAnalysis) useCases += analysis
+
+            lensesSupported = true
+            camera = try {
+                p.bindToLifecycle(owner, selector, *useCases.toTypedArray())
             } catch (t: Throwable) {
-                try {
-                    camera = p.bindToLifecycle(owner, selector, previewUseCase, ic, vc)
+                if (wantsAnalysis) {
+                    // Some devices cap concurrent use cases; retry without analysis.
+                    analysis.clearAnalyzer()
                     lensesSupported = false
-                    false
-                } catch (t2: Throwable) {
-                    errorMessage = t2.message ?: "Camera failed to bind"
+                    val reduced = useCases.filter { it !== analysis }.toTypedArray()
+                    p.bindToLifecycle(owner, selector, *reduced)
+                } else {
+                    errorMessage = t.message ?: "Camera failed to bind"
                     return
                 }
             }
 
             imageCapture = ic
             videoCapture = vc
-            imageAnalysis = if (bound) analysis else null
-            if (!bound) {
-                analysis.clearAnalyzer()
-                faceState = null
-            }
+            imageAnalysis = analysis
+            if (!wantsAnalysis || !lensesSupported) faceState = null
 
             camera?.cameraInfo?.zoomState?.observe(owner) { state: ZoomState ->
                 maxZoom = state.maxZoomRatio
             }
             applyZoom()
-            LiveFilterEffect.apply(view, filter)
+            LiveFilterEffect.apply(view, filter, beauty)
         } catch (t: Throwable) {
             errorMessage = t.message ?: "Camera failed to bind"
         }
@@ -176,6 +186,8 @@ class CameraController(private val context: Context) {
         if (mode == newMode) return
         if (isRecording) stopRecording()
         mode = newMode
+        // Rebind so only the use cases this mode needs stay active.
+        rebind()
     }
 
     fun switchCamera() {
@@ -207,15 +219,21 @@ class CameraController(private val context: Context) {
 
     fun applyFilter(newFilter: Filter) {
         filter = newFilter
-        previewView?.let { LiveFilterEffect.apply(it, newFilter) }
+        refreshPreviewEffect()
     }
 
-    fun applyBeauty(settings: BeautySettings) { beauty = settings }
+    fun applyBeauty(settings: BeautySettings) {
+        beauty = settings
+        refreshPreviewEffect()
+    }
 
     fun applyLens(newLens: Lens) {
+        val wasActive = lensesEnabled
         lens = newLens
         lensesEnabled = newLens.art.isNotEmpty()
         if (!lensesEnabled) faceState = null
+        // Analysis is only bound when a lens is active, so rebind on that edge.
+        if (wasActive != lensesEnabled) rebind()
     }
 
     fun applyExtension(ext: CamaraExtension) {
@@ -227,6 +245,10 @@ class CameraController(private val context: Context) {
     fun setZoomRatio(ratio: Float) {
         zoom = ratio.coerceIn(1f, if (maxZoom > 1f) maxZoom else 1f)
         applyZoom()
+    }
+
+    private fun refreshPreviewEffect() {
+        previewView?.let { LiveFilterEffect.apply(it, filter, beauty) }
     }
 
     private fun applyZoom() {

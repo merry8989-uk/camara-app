@@ -1,6 +1,8 @@
 package com.camara.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.camara.app.beauty.BeautySettings
 import com.camara.app.ui.theme.Accent
 
-/** Vertical panel of beauty sliders. Each row drives one [BeautySettings] field. */
+/** Vertical panel of beauty sliders, plus one-tap Enhance and Reset. */
 @Composable
 fun BeautyPanel(
     settings: BeautySettings,
@@ -36,17 +38,28 @@ fun BeautyPanel(
         modifier = modifier
             .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
             .background(Color(0xF214141A))
-            .padding(horizontal = 18.dp, vertical = 14.dp)
-            .height(230.dp)
+            .padding(horizontal = 18.dp, vertical = 12.dp)
+            .height(250.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Text(
-            "Beauty",
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp,
-            modifier = Modifier.padding(bottom = 6.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Beauty",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PillAction("Enhance face", filled = true) { onChange(BeautySettings.enhance()) }
+                PillAction("Reset") { onChange(BeautySettings.DEFAULT) }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+
         BeautySlider("Smooth", settings.smooth, 0f, 1f) { onChange(settings.copy(smooth = it)) }
         BeautySlider("Brighten", settings.brighten, 0f, 1f) { onChange(settings.copy(brighten = it)) }
         BeautySlider("Warmth", settings.warmth, -1f, 1f) { onChange(settings.copy(warmth = it)) }
@@ -54,8 +67,31 @@ fun BeautyPanel(
         BeautySlider("Slim face", settings.slimFace, 0f, 1f) { onChange(settings.copy(slimFace = it)) }
         BeautySlider("Enlarge eyes", settings.enlargeEyes, 0f, 1f) { onChange(settings.copy(enlargeEyes = it)) }
         BeautySlider("Sharpen", settings.sharpen, 0f, 1f) { onChange(settings.copy(sharpen = it)) }
+
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Smooth, brighten, warmth and skin tone preview live. Slim face, eye " +
+                "enlargement and sharpen are applied to the captured photo.",
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = 10.sp
+        )
         Spacer(Modifier.height(8.dp))
     }
+}
+
+@Composable
+private fun PillAction(text: String, filled: Boolean = false, onClick: () -> Unit) {
+    Text(
+        text = text,
+        color = Color.White,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (filled) Accent else Color.White.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    )
 }
 
 @Composable
