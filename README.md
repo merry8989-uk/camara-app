@@ -91,8 +91,8 @@ then edit photos and videos — all in one app, built with Kotlin, Jetpack Compo
 | Video | Media3 1.11 (ExoPlayer, Transformer, Effect) |
 | Face / AR | ML Kit face detection |
 | Colour pipeline | Custom 4×5 colour-matrix engine + `RenderEffect` / `RgbMatrix` |
-| Min / target SDK | 24 / 34 |
-| Build | Gradle 8.7, AGP 8.5.2, Kotlin 2.0.20 |
+| SDK | min 24 · target 34 · compile 36 |
+| Build | Gradle 8.7, AGP 8.5.2, Kotlin 2.2.10 |
 
 ---
 
@@ -117,6 +117,15 @@ cd camara-app
 
 The debug APK lands in `app/build/outputs/apk/debug/app-debug.apk`.
 You can also just open the folder in Android Studio and hit **Run**.
+
+### Grab a prebuilt APK
+Every push to `main` builds a debug APK on GitHub Actions. Open the
+**Actions** tab, pick the latest **Android CI** run, and download the
+`camara-debug-apk` artifact from the run summary.
+
+> The build compiles against **API 36** because Media3 1.10+ requires it, and uses
+> **Kotlin 2.2.10** to match Media3's Kotlin metadata. Both are set in
+> `app/build.gradle.kts`, `build.gradle.kts` and `gradle.properties`.
 
 > The Gradle wrapper is included, so `./gradlew` works out of the box. If your
 > environment blocks the wrapper, run `gradle wrapper` once to regenerate it.
