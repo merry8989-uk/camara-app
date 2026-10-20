@@ -1,46 +1,64 @@
-# Signing keystore
+# Signing
 
-`camara-dev.p12` is a **throwaway development key**. It is committed to this
-repository *on purpose*.
+**No signing material lives in this repository.** The keystore is stored as an
+encrypted GitHub Actions secret and decoded only inside the CI runner.
 
-## Why commit a keystore?
+## Why it works this way
 
 Android refuses to install an APK as an update unless it is signed with the same
-certificate as the installed copy. CI runners start empty and generate a fresh
-debug key each time, so every build was signed differently and the app had to be
-uninstalled before installing the next build.
+certificate as the installed copy. CI runners start empty, so if the key isn't
+provided they generate a fresh one per run — different certificate every time, and
+you have to uninstall before installing the next build.
 
-Committing one key means **every build — local and CI — is signed identically**, so
-installs update in place.
+So the key is kept stable, but **private**: stored as a secret rather than committed.
 
-## This key is NOT secret
+## Repository secrets
 
-The password is in `app/build.gradle.kts` (`camara123`) and the file is public.
-Anyone can sign an APK that Android will accept as an update to Camara. That is
-acceptable for a hobby/test app with no sensitive data. It is **not** acceptable
-for anything you distribute seriously.
-
-## Details
-
-| | |
+| Secret | Contents |
 | --- | --- |
-| File | `keystore/camara-dev.p12` |
-| Type | PKCS#12 |
-| Alias | `camara` |
-| Store / key password | `camara123` |
-| Certificate | self-signed, RSA 2048, valid ~30 years |
-| Certificate SHA-256 | `B4:FF:CE:56:D6:57:D7:3F:ED:0E:7B:D0:5B:0D:8A:55:64:D8:AD:6C:43:09:12:B6:16:DC:B6:F7:16:EB:1A:86` |
+| `CAMARA_KEYSTORE_BASE64` | the `.p12` keystore, base64-encoded |
+| `CAMARA_STORE_PASSWORD` | keystore password |
+| `CAMARA_KEY_PASSWORD` | key password |
+
+Plus a plain workflow variable, `CAMARA_KEY_ALIAS` (`camara`).
+
+CI writes the decoded keystore to `keystore/camara-dev.p12` (a git-ignored path) and
+points `CAMARA_KEYSTORE` at it. Locally you can do the same — set the environment
+variables, or drop your own keystore at `keystore/camara-dev.p12`.
+
+## Rotating the key
+
+```bash
+# 1. Make a new keystore (keep it OUT of the repo)
+keytool -genkeypair -v -keystore camara-release.jks -alias camara \
+  -keyalg RSA -keysize 2048 -validity 10000
+
+# 2. Base64 it and update the secret
+base64 -w0 camara-release.jks     # paste into CAMARA_KEYSTORE_BASE64
+```
+
+Then update `CAMARA_STORE_PASSWORD` / `CAMARA_KEY_PASSWORD`.
+
+⚠️ Rotating changes the certificate, so **every existing install must be uninstalled
+once** before the new build will install. Rotate deliberately.
+
+## A note on history
+
+An earlier version of this project committed a **throwaway** keystore
+(`keystore/camara-dev.p12`) to the repository. That file has been deleted from the
+working tree, but **it still exists in git history** — deleting a file does not
+rewrite past commits. That key is no longer used by any build, but it should be
+treated as public and never reused.
+
+The current key was generated after that and has never been committed, so it is
+genuinely private.
 
 ## Before you publish for real
 
-1. Generate your own keystore and **keep it private** (never commit it):
-   ```bash
-   keytool -genkeypair -v -keystore camara-release.jks -alias camara \
-     -keyalg RSA -keysize 2048 -validity 10000
-   ```
-2. Point `signingConfigs.camara` at it, and load the passwords from
-   environment variables or `local.properties` rather than hard-coding them.
-3. Back the keystore up. If you lose it you can never update the app again.
-4. Build an **App Bundle** (`./gradlew bundleRelease`) for the Play Store — Play
+1. Load the passwords from secrets (as CI does here) — never hard-code them.
+2. **Back the keystore up somewhere safe.** Lose it and you can never update the
+   app again; you would have to publish under a new package name.
+3. Build an **App Bundle** (`./gradlew bundleRelease`) for the Play Store. Play
    re-signs with its own key and delivers per-device splits, which shrinks the
    download further.
+4. Consider enabling Play App Signing so Google holds the distribution key.

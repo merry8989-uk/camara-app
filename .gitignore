@@ -10,5 +10,10 @@
 local.properties
 *.apk
 *.aab
+
+# Signing material is never committed — see keystore/README.md
 *.keystore
+*.jks
+*.p12
+keystore/*.p12
 !debug.keystore

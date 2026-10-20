@@ -201,26 +201,32 @@ nothing until the model lands.
 
 ## 🔑 Signing
 
-Every build — local and CI — is signed with the **same certificate**, from
-`keystore/camara-dev.p12`. That matters because Android refuses to install an APK as an
-update unless it carries the same certificate as the installed copy. CI runners start empty
-and generate a fresh debug key each time, so without a committed key every build was signed
-differently and you had to uninstall before installing the next one.
+**No signing material is committed to this repository.** The keystore lives in GitHub
+Actions secrets and is decoded only inside the CI runner.
 
-| | |
+That matters because Android refuses to install an APK as an update unless it carries the
+same certificate as the installed copy. CI runners start empty, so if no key is provided
+they generate a fresh one per run — a different certificate every time, forcing an
+uninstall before each install.
+
+| Secret | Contents |
 | --- | --- |
-| Keystore | `keystore/camara-dev.p12` (PKCS#12) |
-| Alias | `camara` |
-| Password | `camara123` (both store and key) |
-| Certificate SHA-256 | `B4:FF:CE:56:D6:57:D7:3F:ED:0E:7B:D0:5B:0D:8A:55:64:D8:AD:6C:43:09:12:B6:16:DC:B6:F7:16:EB:1A:86` |
+| `CAMARA_KEYSTORE_BASE64` | the `.p12` keystore, base64-encoded |
+| `CAMARA_STORE_PASSWORD` | keystore password |
+| `CAMARA_KEY_PASSWORD` | key password |
 
-> ⚠️ **This key is not secret.** It is committed on purpose so the build is reproducible and
-> updates install cleanly. Anyone can sign an APK Android will accept as an update to
-> Camara. That is fine for a test app with no sensitive data, and **not** fine for anything
-> you ship seriously — see `keystore/README.md` for what to do before publishing for real.
+Locally, set the same environment variables or drop your own keystore at
+`keystore/camara-dev.p12` (git-ignored). If no keystore is found the build still succeeds,
+just unsigned.
 
 CI builds `assembleRelease` and fails if the v1 signature is missing, so a broken signing
 setup can't slip through.
+
+> **History note:** an earlier version committed a *throwaway* keystore to the repo. The
+> file has been removed from the tree, but it still exists in git history — deleting a file
+> does not rewrite past commits. That key is no longer used by any build and should be
+> treated as public. The current key was generated afterwards and has never been committed.
+> See `keystore/README.md`.
 
 ## 🔄 Content catalogue (update content without an app release)
 
@@ -318,8 +324,9 @@ That single matrix is reused everywhere:
 - [ ] Live filter + lens applied to the *recorded* video stream (not just the preview)
 - [x] Remote content catalogue (filters / stickers / lenses synced without an app release)
 - [x] Small APK via unbundled ML Kit + R8 (no OBB needed)
-- [x] Stable signing keystore so builds update in place
-- [ ] Replace the throwaway keystore with a private one and ship an AAB
+- [x] Stable signing so builds update in place
+- [x] Signing key moved to repository secrets (never committed)
+- [ ] Ship a Play-ready App Bundle
 - [ ] Custom filter creation and user presets
 - [ ] Direct share targets for specific social apps
 

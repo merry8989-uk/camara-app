@@ -4,6 +4,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Signing material is NEVER committed to this repository.
+// CI decodes it from repository secrets into a file and points CAMARA_KEYSTORE at it.
+// Locally, either set the same environment variables or drop your own keystore at
+// keystore/camara-dev.p12 (that path is git-ignored).
+val camaraKeystoreFile: java.io.File? = run {
+    val env = System.getenv("CAMARA_KEYSTORE")
+    val candidate = if (!env.isNullOrBlank()) file(env) else rootProject.file("keystore/camara-dev.p12")
+    candidate.takeIf { it.exists() }
+}
+
 android {
     namespace = "com.camara.app"
     // Media3 1.10+ requires compiling against API 36.
@@ -13,8 +23,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.3.1"
+        versionCode = 7
+        versionName = "1.4.0"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -28,23 +38,19 @@ android {
 
     signingConfigs {
         create("camara") {
-            // A THROWAWAY development key, committed on purpose so that every build
-            // (local and CI) is signed with the SAME certificate. Without this, each
-            // CI run generated a fresh debug key and Android refused to install an
-            // update over an existing install — you had to uninstall first.
-            //
-            // It is not a secret and must NEVER be used to publish a real app.
-            // Replace it with your own keystore and keep that one private.
-            storeFile = rootProject.file("keystore/camara-dev.p12")
-            storeType = "PKCS12"
-            storePassword = "camara123"
-            keyAlias = "camara"
-            keyPassword = "camara123"
-            // v1 signing is forced on so the signing certificate is inspectable
-            // (META-INF/CERT.RSA) and can be verified in CI.
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
+            val ks = camaraKeystoreFile
+            if (ks != null) {
+                storeFile = ks
+                storeType = "PKCS12"
+                storePassword = System.getenv("CAMARA_STORE_PASSWORD").orEmpty()
+                keyAlias = System.getenv("CAMARA_KEY_ALIAS") ?: "camara"
+                keyPassword = System.getenv("CAMARA_KEY_PASSWORD").orEmpty()
+                // v1 signing is enabled so the signing certificate stays inspectable
+                // (META-INF/CERT.RSA) and CI can verify it.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
         }
     }
 
@@ -54,7 +60,7 @@ android {
         debug {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("camara")
+            if (camaraKeystoreFile != null) signingConfig = signingConfigs.getByName("camara")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -63,7 +69,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("camara")
+            if (camaraKeystoreFile != null) signingConfig = signingConfigs.getByName("camara")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

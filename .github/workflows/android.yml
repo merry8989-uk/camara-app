@@ -43,9 +43,26 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      # Signed with the committed throwaway key (keystore/camara-dev.p12) so every
-      # build carries the same certificate and installs can be updated in place.
+      # The signing keystore is NOT in the repository. It is stored as a base64
+      # repository secret and decoded here, so the key stays private while every
+      # build still carries the same certificate (so updates install in place).
+      - name: Decode signing keystore from secrets
+        run: |
+          set -e
+          if [ -z "${{ secrets.CAMARA_KEYSTORE_BASE64 }}" ]; then
+            echo "::error::CAMARA_KEYSTORE_BASE64 is not set — add the signing secrets."
+            exit 1
+          fi
+          mkdir -p keystore
+          printf '%s' "${{ secrets.CAMARA_KEYSTORE_BASE64 }}" | base64 -d > keystore/camara-dev.p12
+          ls -l keystore/camara-dev.p12
+
       - name: Build signed release APK
+        env:
+          CAMARA_KEYSTORE: keystore/camara-dev.p12
+          CAMARA_KEY_ALIAS: camara
+          CAMARA_STORE_PASSWORD: ${{ secrets.CAMARA_STORE_PASSWORD }}
+          CAMARA_KEY_PASSWORD: ${{ secrets.CAMARA_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace --no-daemon
 
       - name: Verify signing certificate
