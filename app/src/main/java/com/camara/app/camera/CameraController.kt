@@ -38,8 +38,10 @@ import com.camara.app.filters.FilterPresets
 import com.camara.app.filters.LiveFilterEffect
 import com.camara.app.lenses.FaceAnalyzer
 import com.camara.app.lenses.FaceState
+import androidx.compose.ui.geometry.Offset
 import com.camara.app.lenses.Lens
 import com.camara.app.lenses.LensCatalog
+import com.camara.app.portrait.PortraitSettings
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -61,7 +63,9 @@ class CameraController(private val context: Context) {
     var maxZoom by mutableFloatStateOf(1f); private set
     var isRecording by mutableStateOf(false); private set
     var filter by mutableStateOf(FilterPresets.NONE); private set
+    var filterIntensity by mutableFloatStateOf(1f); private set
     var beauty by mutableStateOf(BeautySettings.DEFAULT); private set
+    var portrait by mutableStateOf(PortraitSettings()); private set
     var timerSeconds by mutableIntStateOf(0); private set
     var showGrid by mutableStateOf(false); private set
     var extension by mutableStateOf(CamaraExtension.AUTO); private set
@@ -174,7 +178,7 @@ class CameraController(private val context: Context) {
                 maxZoom = state.maxZoomRatio
             }
             applyZoom()
-            LiveFilterEffect.apply(view, filter, beauty)
+            LiveFilterEffect.apply(view, filter, filterIntensity, beauty)
         } catch (t: Throwable) {
             errorMessage = t.message ?: "Camera failed to bind"
         }
@@ -222,9 +226,23 @@ class CameraController(private val context: Context) {
         refreshPreviewEffect()
     }
 
+    fun applyFilterIntensity(value: Float) {
+        filterIntensity = value.coerceIn(0f, 1f)
+        refreshPreviewEffect()
+    }
+
     fun applyBeauty(settings: BeautySettings) {
         beauty = settings
         refreshPreviewEffect()
+    }
+
+    /** Portrait depth is baked into the capture; the preview just records the settings. */
+    fun applyPortrait(settings: PortraitSettings) {
+        portrait = settings
+    }
+
+    fun setSubjectPoint(point: Offset?) {
+        portrait = portrait.copy(subjectPoint = point)
     }
 
     fun applyLens(newLens: Lens) {
@@ -248,7 +266,7 @@ class CameraController(private val context: Context) {
     }
 
     private fun refreshPreviewEffect() {
-        previewView?.let { LiveFilterEffect.apply(it, filter, beauty) }
+        previewView?.let { LiveFilterEffect.apply(it, filter, filterIntensity, beauty) }
     }
 
     private fun applyZoom() {

@@ -16,32 +16,63 @@ import com.camara.app.util.BitmapUtils
 import kotlin.math.max
 import kotlin.math.min
 
-/** Bakes an [ImageEditState] into a single flattened bitmap for export. */
+/**
+ * Flattens an edit into a single bitmap.
+ *
+ * The work is split into stages so a caller can interleave face-aware steps
+ * (face-only beauty, portrait bokeh, lens baking) between them — see
+ * `core.PhotoProcessor`.
+ */
 object ImageExporter {
 
-    fun render(source: Bitmap, edit: ImageEditState): Bitmap {
-        // 1. Geometry: rotate, flip, crop.
+    // ------------------------------------------------------------- stage 1
+
+    /** Rotation, flips and crop. */
+    fun renderGeometry(source: Bitmap, edit: ImageEditState): Bitmap {
         var bmp = source
         if (edit.rotationDeg != 0f) bmp = BitmapUtils.rotate(bmp, edit.rotationDeg)
         if (edit.flipH) bmp = BitmapUtils.flip(bmp, true)
         if (edit.flipV) bmp = BitmapUtils.flip(bmp, false)
         if (edit.crop != CropRect.FULL) bmp = cropTo(bmp, edit.crop)
+        return bmp
+    }
 
-        // 2. Colour: filter composed over manual adjustments.
-        val needsColor = !edit.filter.isIdentity || !edit.adjustments.isDefault
-        if (needsColor) {
-            val matrix = ColorMatrixMath.compose(edit.filter.matrix, edit.adjustments.matrix())
-            bmp = applyMatrix(bmp, matrix)
+    // ------------------------------------------------------------- stage 2
+
+    /** Filter (at its chosen strength) composed with manual adjustments. */
+    fun renderColour(src: Bitmap, edit: ImageEditState): Bitmap {
+        val filterMatrix = edit.filter.matrixAt(edit.filterIntensity)
+        val needsColour = !edit.filter.isIdentity || !edit.adjustments.isDefault
+        if (!needsColour) return src
+        val matrix = ColorMatrixMath.compose(filterMatrix, edit.adjustments.matrix())
+        return applyMatrix(src, matrix)
+    }
+
+    // ------------------------------------------------------------- stage 3
+
+    /** Strokes, stickers, text and frame. */
+    fun renderOverlays(src: Bitmap, edit: ImageEditState): Bitmap {
+        if (edit.strokes.isEmpty() && edit.stickers.isEmpty() &&
+            edit.texts.isEmpty() && edit.frame == FrameStyle.NONE
+        ) {
+            return src
         }
-
-        // 3. Overlays: strokes, stickers, text, frame.
-        val out = bmp.copy(Bitmap.Config.ARGB_8888, true)
+        val out = src.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(out)
         drawStrokes(canvas, out, edit.strokes)
         drawStickers(canvas, out, edit.stickers)
         drawTexts(canvas, out, edit.texts)
         drawFrame(canvas, out, edit.frame)
         return out
+    }
+
+    // -------------------------------------------------------- convenience
+
+    /** Geometry + colour + overlays, with no face-aware steps. */
+    fun render(source: Bitmap, edit: ImageEditState): Bitmap {
+        var bmp = renderGeometry(source, edit)
+        bmp = renderColour(bmp, edit)
+        return renderOverlays(bmp, edit)
     }
 
     private fun applyMatrix(src: Bitmap, matrix: FloatArray): Bitmap {

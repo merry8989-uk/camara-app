@@ -1,8 +1,10 @@
 package com.camara.app.editor.image
 
+import com.camara.app.beauty.BeautySettings
 import com.camara.app.filters.ColorMatrixMath
 import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterPresets
+import com.camara.app.portrait.PortraitSettings
 import com.camara.app.stickers.PlacedSticker
 
 /** Normalised point (0..1) so drawing survives preview-to-export scaling. */
@@ -91,6 +93,9 @@ data class ImageEditState(
     val crop: CropRect = CropRect.FULL,
     val cropAspectLock: Float? = null,
     val filter: Filter = FilterPresets.NONE,
+    val filterIntensity: Float = 1f,
+    val beauty: BeautySettings = BeautySettings.DEFAULT,
+    val portrait: PortraitSettings = PortraitSettings(),
     val adjustments: Adjustments = Adjustments.DEFAULT,
     val stickers: List<PlacedSticker> = emptyList(),
     val texts: List<TextItem> = emptyList(),
@@ -100,6 +105,7 @@ data class ImageEditState(
     val hasEdits: Boolean
         get() = rotationDeg != 0f || flipH || flipV || crop != CropRect.FULL ||
             !filter.isIdentity || !adjustments.isDefault ||
+            !beauty.isDefault || portrait.enabled ||
             stickers.isNotEmpty() || texts.isNotEmpty() ||
             strokes.isNotEmpty() || frame != FrameStyle.NONE
 }

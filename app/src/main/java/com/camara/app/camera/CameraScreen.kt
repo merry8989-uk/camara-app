@@ -12,6 +12,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FaceRetouchingNatural
+import androidx.compose.material.icons.filled.FilterFrames
 import androidx.compose.material.icons.filled.FlashAuto
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
@@ -42,6 +45,8 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -55,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -64,15 +70,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.camara.app.beauty.BeautyRenderer
-import com.camara.app.filters.FilterRenderer
+import com.camara.app.core.PhotoProcessor
+import com.camara.app.editor.image.ImageEditState
 import com.camara.app.lenses.LensOverlay
 import com.camara.app.lenses.LensPicker
 import com.camara.app.lenses.LensRenderer
 import com.camara.app.lenses.NoFaceHint
+import com.camara.app.portrait.PortraitSettings
 import com.camara.app.stickers.PlacedSticker
 import com.camara.app.stickers.StickerLayer
-import com.camara.app.stickers.StickerRenderer
 import com.camara.app.teleprompter.TeleprompterOverlay
 import com.camara.app.ui.components.BeautyPanel
 import com.camara.app.ui.components.CircleIconButton
@@ -89,7 +95,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class CameraPanel { NONE, FILTERS, STICKERS, BEAUTY, LENSES }
+private enum class CameraPanel { NONE, FILTERS, STICKERS, BEAUTY, PORTRAIT, LENSES }
 
 @Composable
 fun CameraScreen(
@@ -157,22 +163,20 @@ private fun CameraContent(
     }
 
     fun processAndOpenPhoto(uri: Uri, capturedStickers: List<PlacedSticker>) {
-        // Read Compose state on the main thread, then do the pixel work off it.
-        val filterNow = controller.filter
-        val beautyNow = controller.beauty
+        // Snapshot Compose state on the main thread, then run the shared pipeline off it.
+        val edit = ImageEditState(
+            filter = controller.filter,
+            filterIntensity = controller.filterIntensity,
+            beauty = controller.beauty,
+            portrait = controller.portrait,
+            stickers = capturedStickers
+        )
         val lensNow = controller.lens
-        val faceNow = controller.faceState
 
         scope.launch {
             withContext(Dispatchers.IO) {
                 val bmp = BitmapUtils.decodeUri(context, uri) ?: return@withContext
-                var out = bmp
-                if (!beautyNow.isDefault) out = BeautyRenderer.apply(out, beautyNow)
-                out = FilterRenderer.apply(out, filterNow)
-                out = StickerRenderer.bake(out, capturedStickers)
-                if (lensNow != null && lensNow.art.isNotEmpty() && faceNow != null) {
-                    out = LensRenderer.bake(out, lensNow, faceNow)
-                }
+                val out = PhotoProcessor.process(context, bmp, edit, lensNow)
                 MediaStoreUtils.writeImage(context, uri, BitmapUtils.toJpegBytes(out))
             }
             withContext(Dispatchers.Main) { onEditPhoto(uri) }
@@ -216,6 +220,22 @@ private fun CameraContent(
                 .pointerInput(Unit) {
                     detectTransformGestures { _, _, zoomChange, _ ->
                         controller.setZoomRatio(controller.zoom * zoomChange)
+                    }
+                }
+                .pointerInput(panel) {
+                    detectTapGestures { offset ->
+                        if (panel != CameraPanel.PORTRAIT) return@detectTapGestures
+                        // Map the tap through the FILL_CENTER crop back to image space,
+                        // and undo the selfie mirror, so the subject pick lines up.
+                        val aspect = 0.75f
+                        val displayedW = maxOf(size.width.toFloat(), size.height * aspect)
+                        val displayedH = displayedW / aspect
+                        val offX = (size.width - displayedW) / 2f
+                        val offY = (size.height - displayedH) / 2f
+                        var nx = ((offset.x - offX) / displayedW).coerceIn(0f, 1f)
+                        val ny = ((offset.y - offY) / displayedH).coerceIn(0f, 1f)
+                        if (controller.lensFacing == CameraSelector.LENS_FACING_FRONT) nx = 1f - nx
+                        controller.setSubjectPoint(Offset(nx, ny))
                     }
                 }
         )
@@ -334,6 +354,12 @@ private fun CameraContent(
                 onClick = { panel = if (panel == CameraPanel.BEAUTY) CameraPanel.NONE else CameraPanel.BEAUTY }
             )
             CircleIconButton(
+                icon = Icons.Filled.FilterFrames,
+                contentDescription = "Portrait depth",
+                selected = panel == CameraPanel.PORTRAIT,
+                onClick = { panel = if (panel == CameraPanel.PORTRAIT) CameraPanel.NONE else CameraPanel.PORTRAIT }
+            )
+            CircleIconButton(
                 icon = Icons.Filled.Face,
                 contentDescription = "Lenses",
                 selected = panel == CameraPanel.LENSES,
@@ -352,7 +378,9 @@ private fun CameraContent(
                 CameraPanel.FILTERS -> FilterStrip(
                     selected = controller.filter,
                     onSelect = { controller.applyFilter(it) },
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    intensity = controller.filterIntensity,
+                    onIntensityChange = { controller.applyFilterIntensity(it) }
                 )
                 CameraPanel.STICKERS -> StickerPanel(
                     onPick = { glyph ->
@@ -367,6 +395,10 @@ private fun CameraContent(
                 CameraPanel.BEAUTY -> BeautyPanel(
                     settings = controller.beauty,
                     onChange = { controller.applyBeauty(it) }
+                )
+                CameraPanel.PORTRAIT -> PortraitPanel(
+                    settings = controller.portrait,
+                    onChange = { controller.applyPortrait(it) }
                 )
                 CameraPanel.LENSES -> Column {
                     LensPicker(
@@ -482,6 +514,64 @@ private fun CameraContent(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PortraitPanel(
+    settings: PortraitSettings,
+    onChange: (PortraitSettings) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(Color(0xF214141A))
+            .padding(horizontal = 18.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Portrait depth", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = if (settings.enabled) "On" else "Off",
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (settings.enabled) Accent else Color.White.copy(alpha = 0.12f))
+                    .clickable { onChange(settings.copy(enabled = !settings.enabled)) }
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Blur", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, modifier = Modifier.width(52.dp))
+            Slider(
+                value = settings.strength,
+                onValueChange = { onChange(settings.copy(strength = it, enabled = true)) },
+                valueRange = 0.05f..1f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = Accent,
+                    activeTrackColor = Accent,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+                )
+            )
+        }
+        Text(
+            if (settings.subjectPoint == null) {
+                "Tap the preview to pick what stays sharp. Depth is baked into the photo."
+            } else {
+                "Subject picked — tap elsewhere to change it. Depth is baked into the photo."
+            },
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = 10.sp
+        )
+        Spacer(Modifier.height(8.dp))
     }
 }
 

@@ -7,13 +7,10 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 
 /**
- * Draws the active [lens] anchored to the detected [face], mapped from the upright
- * analysis frame onto the preview surface.
+ * Draws the active [lens] over the camera preview.
  *
- * The preview uses FILL_CENTER, so the displayed image is
- * `max(viewW, viewH * aspect)` wide; the face's normalised coordinates are mapped
- * through that box. For the front camera the horizontal axis is mirrored to match
- * the preview.
+ * [LensRenderer] handles the FILL_CENTER mapping, so the overlay just hands it the
+ * view size and whether the preview is mirrored.
  */
 @Composable
 fun LensOverlay(
@@ -25,32 +22,15 @@ fun LensOverlay(
     if (lens == null || lens.art.isEmpty() || face == null) return
 
     Canvas(modifier = modifier) {
-        val viewW = size.width
-        val viewH = size.height
-        if (viewW <= 0f || viewH <= 0f) return@Canvas
-
-        val aspect = if (face.imageAspect > 0f) face.imageAspect else 0.75f
-        val displayedW = maxOf(viewW, viewH * aspect)
-        val displayedH = displayedW / aspect
-        val offsetX = (viewW - displayedW) / 2f
-        val offsetY = (viewH - displayedH) / 2f
-
-        val nx = if (mirrored) 1f - face.cx else face.cx
-        val cx = offsetX + nx * displayedW
-        val cy = offsetY + face.cy * displayedH
-        val faceW = face.w * displayedW
-        val faceH = face.h * displayedH
-        val roll = if (mirrored) -face.rollDegrees else face.rollDegrees
-
+        if (size.width <= 0f || size.height <= 0f) return@Canvas
         drawIntoCanvas { canvas ->
             LensRenderer.draw(
                 canvas = canvas.nativeCanvas,
                 lens = lens,
-                cx = cx,
-                cy = cy,
-                faceW = faceW,
-                faceH = faceH,
-                roll = roll
+                face = face,
+                viewW = size.width,
+                viewH = size.height,
+                mirrored = mirrored
             )
         }
     }

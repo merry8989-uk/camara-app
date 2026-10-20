@@ -27,15 +27,15 @@ import com.camara.app.beauty.BeautySettings
  */
 object LiveFilterEffect {
 
-    fun apply(view: View, filter: Filter, beauty: BeautySettings) {
+    fun apply(view: View, filter: Filter, intensity: Float, beauty: BeautySettings) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            applyApi31(view, filter, beauty)
+            applyApi31(view, filter, intensity, beauty)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
-    private fun applyApi31(view: View, filter: Filter, beauty: BeautySettings) {
-        val hasColour = !filter.isIdentity || beauty.hasGrade
+    private fun applyApi31(view: View, filter: Filter, intensity: Float, beauty: BeautySettings) {
+        val hasColour = (!filter.isIdentity && intensity > 0.01f) || beauty.hasGrade
         val hasBlur = beauty.smooth > 0.01f
 
         if (!hasColour && !hasBlur) {
@@ -46,7 +46,7 @@ object LiveFilterEffect {
         var effect: RenderEffect? = null
 
         if (hasColour) {
-            val matrix = ColorMatrixMath.compose(filter.matrix, beauty.gradeMatrix())
+            val matrix = ColorMatrixMath.compose(filter.matrixAt(intensity), beauty.gradeMatrix())
             effect = RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(matrix))
         }
 

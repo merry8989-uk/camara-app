@@ -3,20 +3,17 @@ package com.camara.app.lenses
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import androidx.compose.ui.geometry.Offset
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import com.google.mlkit.vision.face.FaceLandmark
 
 /**
  * CameraX [ImageAnalysis.Analyzer] that runs ML Kit face detection and reports the
- * largest face as a normalised [FaceState].
+ * largest face as a normalised [FaceState], including landmarks and contours.
  *
- * ML Kit reports the bounding box in the *upright* (rotation-applied) image space,
- * so we normalise against the upright frame dimensions, swapping width/height for
- * quarter-turn rotations. Callbacks arrive on the analysis executor.
+ * Contours are what make lenses follow the real face shape. Note ML Kit only
+ * returns contours for the single most prominent face, which is exactly what a
+ * face lens wants.
  */
 class FaceAnalyzer(
     private val onFace: (FaceState?) -> Unit
@@ -26,7 +23,7 @@ class FaceAnalyzer(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
+            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
             .setMinFaceSize(0.12f)
             .build()
@@ -48,28 +45,9 @@ class FaceAnalyzer(
         detector.process(input)
             .addOnSuccessListener { faces ->
                 val best = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() }
-                onFace(best?.toState(uprightW, uprightH))
+                onFace(best?.let { FaceMapper.run { it.toFaceState(uprightW, uprightH) } })
             }
             .addOnFailureListener { onFace(null) }
             .addOnCompleteListener { imageProxy.close() }
-    }
-
-    private fun Face.toState(imgW: Float, imgH: Float): FaceState {
-        val box = boundingBox
-        fun landmark(type: Int): Offset? =
-            getLandmark(type)?.position?.let { Offset(it.x / imgW, it.y / imgH) }
-
-        return FaceState(
-            cx = (((box.left + box.right) / 2f) / imgW).coerceIn(0f, 1f),
-            cy = (((box.top + box.bottom) / 2f) / imgH).coerceIn(0f, 1f),
-            w = box.width() / imgW,
-            h = box.height() / imgH,
-            rollDegrees = headEulerAngleZ,
-            imageAspect = imgW / imgH,
-            leftEye = landmark(FaceLandmark.LEFT_EYE),
-            rightEye = landmark(FaceLandmark.RIGHT_EYE),
-            nose = landmark(FaceLandmark.NOSE_BASE),
-            mouth = landmark(FaceLandmark.MOUTH_BOTTOM)
-        )
     }
 }

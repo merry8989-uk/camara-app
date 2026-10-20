@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.FilterFrames
 import androidx.compose.material.icons.filled.Flip
+import androidx.compose.material.icons.filled.Portrait
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Share
@@ -57,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -67,7 +70,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import com.camara.app.core.PhotoProcessor
 import com.camara.app.filters.ColorMatrixMath
+import com.camara.app.portrait.PortraitBokeh
+import com.camara.app.portrait.PortraitSettings
+import com.camara.app.portrait.SubjectSegmenter
 import com.camara.app.stickers.PlacedSticker
 import com.camara.app.stickers.StickerLayer
 import com.camara.app.ui.components.FilterStrip
@@ -80,7 +87,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class EditorTool { NONE, CROP, ROTATE, ADJUST, FILTER, STICKER, TEXT, DRAW, FRAME }
+private enum class EditorTool { NONE, CROP, ROTATE, ADJUST, FILTER, STICKER, TEXT, DRAW, FRAME, PORTRAIT }
 
 @Composable
 fun ImageEditorScreen(
@@ -131,10 +138,30 @@ fun ImageEditorScreen(
         }
     }
 
-    val colorMatrix = remember(edit.filter, edit.adjustments) {
-        ColorMatrix(ColorMatrixMath.compose(edit.filter.matrix, edit.adjustments.matrix()))
+    val colorMatrix = remember(edit.filter, edit.filterIntensity, edit.adjustments) {
+        ColorMatrix(
+            ColorMatrixMath.compose(
+                edit.filter.matrixAt(edit.filterIntensity),
+                edit.adjustments.matrix()
+            )
+        )
     }
     val needsColor = !edit.filter.isIdentity || !edit.adjustments.isDefault
+
+    // Portrait depth gets a real preview here (unlike the camera, we can afford to
+    // segment a single still image).
+    var portraitPreview by remember { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(
+        edit.portrait, previewSource, edit.rotationDeg, edit.flipH, edit.flipV, edit.crop
+    ) {
+        val src = previewBitmap
+        portraitPreview = if (edit.portrait.enabled && src != null) {
+            val mask = SubjectSegmenter.subjectMask(context, src, edit.portrait.subjectPoint)
+            PortraitBokeh.apply(src, mask, edit.portrait.strength)
+        } else {
+            null
+        }
+    }
 
     fun exportToGallery(onDone: (Uri?) -> Unit) {
         val b = base ?: return
@@ -142,7 +169,7 @@ fun ImageEditorScreen(
         scope.launch {
             val uri = withContext(Dispatchers.IO) {
                 try {
-                    val out = ImageExporter.render(b, edit)
+                    val out = PhotoProcessor.process(context, b, edit)
                     val bytes = BitmapUtils.toJpegBytes(out)
                     val u = MediaStoreUtils.createExportImageUri(context, "edited")
                     MediaStoreUtils.writeImage(context, u, bytes)
@@ -212,9 +239,26 @@ fun ImageEditorScreen(
                         modifier = Modifier
                             .aspectRatio(previewBitmap.width.toFloat() / previewBitmap.height.toFloat())
                             .fillMaxWidth()
+                            .pointerInput(tool) {
+                                detectTapGestures { offset ->
+                                    if (tool != EditorTool.PORTRAIT) return@detectTapGestures
+                                    val w = size.width.toFloat()
+                                    val h = size.height.toFloat()
+                                    if (w <= 0f || h <= 0f) return@detectTapGestures
+                                    edit = edit.copy(
+                                        portrait = edit.portrait.copy(
+                                            subjectPoint = Offset(
+                                                (offset.x / w).coerceIn(0f, 1f),
+                                                (offset.y / h).coerceIn(0f, 1f)
+                                            ),
+                                            enabled = true
+                                        )
+                                    )
+                                }
+                            }
                     ) {
                         Image(
-                            bitmap = previewBitmap.asImageBitmap(),
+                            bitmap = (portraitPreview ?: previewBitmap).asImageBitmap(),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             colorFilter = if (needsColor) ColorFilter.colorMatrix(colorMatrix) else null,
@@ -281,8 +325,17 @@ fun ImageEditorScreen(
                 )
                 EditorTool.ADJUST -> AdjustPanel(edit.adjustments) { edit = edit.copy(adjustments = it) }
                 EditorTool.FILTER -> Box(Modifier.padding(vertical = 10.dp)) {
-                    FilterStrip(selected = edit.filter, onSelect = { edit = edit.copy(filter = it) })
+                    FilterStrip(
+                        selected = edit.filter,
+                        onSelect = { edit = edit.copy(filter = it) },
+                        intensity = edit.filterIntensity,
+                        onIntensityChange = { edit = edit.copy(filterIntensity = it) }
+                    )
                 }
+                EditorTool.PORTRAIT -> PortraitEditorPanel(
+                    settings = edit.portrait,
+                    onChange = { edit = edit.copy(portrait = it) }
+                )
                 EditorTool.STICKER -> StickerPanel(
                     onPick = { glyph ->
                         edit = edit.copy(
@@ -317,6 +370,7 @@ fun ImageEditorScreen(
             EditorToolButton(Icons.Filled.TextFields, "Text", tool == EditorTool.TEXT) { tool = toggle(tool, EditorTool.TEXT) }
             EditorToolButton(Icons.Filled.Brush, "Draw", tool == EditorTool.DRAW) { tool = toggle(tool, EditorTool.DRAW) }
             EditorToolButton(Icons.Filled.FilterFrames, "Frame", tool == EditorTool.FRAME) { tool = toggle(tool, EditorTool.FRAME) }
+            EditorToolButton(Icons.Filled.Portrait, "Portrait", tool == EditorTool.PORTRAIT) { tool = toggle(tool, EditorTool.PORTRAIT) }
         }
     }
 
@@ -549,6 +603,47 @@ private fun FrameOverlay(frame: FrameStyle, modifier: Modifier = Modifier) {
             Spacer(Modifier.weight(0.85f))
             Box(Modifier.fillMaxWidth().weight(0.075f).background(Color.Black))
         }
+    }
+}
+
+@Composable
+private fun PortraitEditorPanel(
+    settings: PortraitSettings,
+    onChange: (PortraitSettings) -> Unit
+) {
+    Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Portrait depth", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = if (settings.enabled) "On" else "Off",
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (settings.enabled) Accent else Color.White.copy(alpha = 0.12f))
+                    .clickable { onChange(settings.copy(enabled = !settings.enabled)) }
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Blur", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, modifier = Modifier.width(52.dp))
+            Slider(
+                value = settings.strength,
+                onValueChange = { onChange(settings.copy(strength = it, enabled = true)) },
+                valueRange = 0.05f..1f,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Text(
+            "Tap the photo to choose what stays sharp. Everything else is blurred.",
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = 10.sp
+        )
     }
 }
 

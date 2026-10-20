@@ -23,17 +23,24 @@ then edit photos and videos — all in one app, built with Kotlin, Jetpack Compo
   automatically when the device/OEM supports them, with a safe fallback when not
 
 ### AR lenses
-- **On-device face detection** (ML Kit) driving masks anchored to the face box and landmarks
-- **15 built-in lenses** — hand-drawn pieces (shades, cat ears, moustache, blush, crown)
-  mixed with emoji accents (flower crown, party, hearts, bunny, puppy, angel, on-fire…)
-- Masks track position, scale and head roll, and are mirrored correctly on the selfie camera
-- Lenses are **baked into the captured photo**, so the saved shot matches the preview
+- **On-device face detection with contours** (ML Kit), so lenses follow the real face shape
+- Pieces are anchored to **landmarks**, sized in units of the **inter-ocular distance**
+  and rotated by the **eye-line angle** — they track the face instead of drifting with
+  the bounding box
+- **~28 lenses**: eyewear (shades, round, heart, lashes), animals (cat, fox, puppy,
+  bunny, panda), makeup (lipstick, blush, glam, face paint), headwear (crown, halo,
+  party hat, flower crown, beanie) and fun (hearts, fire, angel, star, moustache)
+- **Contour-following** pieces: lipstick traces the lip contour, lashes trace the eye
+  contour, face paint fills the face oval
+- Mirrored correctly on the selfie camera, and **baked into the captured photo**
 - Gracefully disables itself on devices that can't bind face analysis alongside all other
   camera use cases
 
 ### Filters
-- **40+ built-in looks** across families: Classic, Warm, Cool, Mono, Cinematic, Snap-style
-  and social-feed styles
+- **~75 built-in looks** across **ten categories**: Original, Portrait, Classic, Warm,
+  Cool, Mono, Cinematic, Vintage, Snap and Social
+- **Strength control** — every look blends from 0–100%, so a filter can be dialled in
+  instead of slammed on (implemented by lerping the matrix toward identity)
 - Real-time live preview on the camera on Android 12+ (GPU `RenderEffect`) and baked into
   the saved file so **what you see is what you get**
 - The preview runs in `ImplementationMode.COMPATIBLE` (TextureView) because a SurfaceView
@@ -47,12 +54,21 @@ then edit photos and videos — all in one app, built with Kotlin, Jetpack Compo
 - Place, drag, pinch to scale, twist to rotate — on the camera preview *and* in the editor
 - Baked into the exported photo at the right position, size and rotation
 
-### Beauty / retouch
+### Beauty / retouch — **face only**
+- Retouch is confined to the **face**, not the whole frame: the face contour becomes a
+  feathered mask and the retouched image is composited back through it, so hair,
+  clothing and background are untouched
 - **Enhance face** — one-tap natural retouch preset
 - Smooth, brighten, warmth and skin tone **preview live on the camera**
 - **Face slimming** and **eye enlargement** via a real vertex-mesh warp
-  (`Canvas.drawBitmapMesh`), not a crop or scale; these are baked into the capture
-  (a mesh warp can't be expressed as a `RenderEffect`)
+  (`Canvas.drawBitmapMesh`), not a crop or scale
+
+### Portrait depth (real bokeh)
+- On-device **subject segmentation** separates the subject from the background
+- **Tap to pick your subject** — the blob under your finger stays sharp and everything
+  else is blurred; without a tap the largest subject is kept
+- Soft, feathered transition between subject and background, with a blur-strength slider
+- Previewed live in the image editor and baked into a camera capture
 
 ### Teleprompter
 - **Transparent, draggable overlay that sits on top of the camera preview**, so you can

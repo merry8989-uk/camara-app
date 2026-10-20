@@ -13,8 +13,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
 
         vectorDrawables { useSupportLibrary = true }
     }
@@ -80,8 +80,11 @@ dependencies {
     implementation("androidx.media3:media3-common:$media3")
     implementation("androidx.media3:media3-ui:$media3")
 
-    // On-device face detection for AR lenses
+    // On-device face detection (AR lenses, face-only beauty)
     implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // On-device subject/background segmentation (portrait bokeh)
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 
     // EXIF orientation handling
     implementation("androidx.exifinterface:exifinterface:1.3.7")
