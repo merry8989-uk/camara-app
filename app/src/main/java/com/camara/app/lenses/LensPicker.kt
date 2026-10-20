@@ -82,10 +82,19 @@ private fun lensSwatch(lens: Lens): String {
     lens.art.filterIsInstance<EmojiArt>().firstOrNull()?.let { return it.emoji }
     return when (lens.art.filterIsInstance<DrawnArt>().firstOrNull()?.kind) {
         DrawKind.GLASSES -> "🕶"
+        DrawKind.ROUND_GLASSES -> "👓"
+        DrawKind.HEART_GLASSES -> "💗"
         DrawKind.CAT_EARS -> "🐱"
         DrawKind.MUSTACHE -> "👨"
         DrawKind.BLUSH -> "☺"
         DrawKind.CROWN -> "👑"
+        DrawKind.LIPS -> "💄"
+        DrawKind.LASHES -> "👁"
+        DrawKind.FACE_PAINT -> "🎨"
+        DrawKind.HALO -> "😇"
+        DrawKind.PARTY_HAT -> "🎉"
+        DrawKind.ANIMAL_NOSE -> "🐾"
+        DrawKind.WHISKERS -> "〰"
         null -> "◯"
     }
 }
