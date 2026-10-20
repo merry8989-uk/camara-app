@@ -59,26 +59,33 @@ jobs:
 
       - name: Build signed release APK
         env:
-          CAMARA_KEYSTORE: keystore/camara-dev.p12
+          # Absolute path on purpose: a relative one would resolve against the app
+          # module directory, not the repo root.
+          CAMARA_KEYSTORE: ${{ github.workspace }}/keystore/camara-dev.p12
           CAMARA_KEY_ALIAS: camara
+          CAMARA_REQUIRE_SIGNING: 'true'
           CAMARA_STORE_PASSWORD: ${{ secrets.CAMARA_STORE_PASSWORD }}
           CAMARA_KEY_PASSWORD: ${{ secrets.CAMARA_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace --no-daemon
 
-      - name: Verify signing certificate
-        run: |
-          set -e
-          APK=$(ls app/build/outputs/apk/release/*.apk | head -n1)
-          echo "APK: $APK"
-          ls -l "$APK"
-          # v1 signing is enabled, so the signing cert is readable from META-INF.
-          unzip -l "$APK" | grep -i 'META-INF/.*\.RSA' || (echo 'No v1 signature found'; exit 1)
-          CERT=$(unzip -p "$APK" 'META-INF/*.RSA' | sha256sum | cut -d' ' -f1)
-          echo "META-INF signature blob sha256: $CERT"
-
+      # Upload first, so the APK is always retrievable even if the check below fails.
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: camara-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Verify signing certificate
+        run: |
+          set -e
+          ls -l app/build/outputs/apk/release/
+          APK=$(ls app/build/outputs/apk/release/app-release.apk 2>/dev/null \
+                || ls app/build/outputs/apk/release/*.apk | head -n1)
+          echo "APK: $APK"
+          if ! unzip -l "$APK" | grep -qiE 'META-INF/.*\.(RSA|DSA|EC|SF)'; then
+            echo "::error::APK has no v1 signature — it is unsigned or signing failed."
+            exit 1
+          fi
+          echo "v1 signature present."
+          unzip -p "$APK" 'META-INF/*.RSA' | sha256sum | cut -d' ' -f1

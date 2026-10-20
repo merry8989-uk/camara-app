@@ -10,8 +10,17 @@ plugins {
 // keystore/camara-dev.p12 (that path is git-ignored).
 val camaraKeystoreFile: java.io.File? = run {
     val env = System.getenv("CAMARA_KEYSTORE")
-    val candidate = if (!env.isNullOrBlank()) file(env) else rootProject.file("keystore/camara-dev.p12")
+    // Resolve relative paths against the ROOT project, not this module — otherwise
+    // "keystore/x.p12" would look in app/keystore/ and silently find nothing, and the
+    // release build would quietly produce an unsigned APK.
+    val candidate = if (!env.isNullOrBlank()) rootProject.file(env) else rootProject.file("keystore/camara-dev.p12")
     candidate.takeIf { it.exists() }
+}
+
+if (camaraKeystoreFile == null) {
+    logger.lifecycle("[camara] No signing keystore found — release builds will be UNSIGNED.")
+} else {
+    logger.lifecycle("[camara] Signing with ${camaraKeystoreFile.absolutePath}")
 }
 
 android {
@@ -70,6 +79,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             if (camaraKeystoreFile != null) signingConfig = signingConfigs.getByName("camara")
+            // Fail loudly rather than shipping a silently-unsigned release APK.
+            if (System.getenv("CAMARA_REQUIRE_SIGNING") == "true" && camaraKeystoreFile == null) {
+                throw GradleException("CAMARA_REQUIRE_SIGNING=true but no signing keystore was found.")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
