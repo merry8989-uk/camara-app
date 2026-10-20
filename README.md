@@ -114,7 +114,7 @@ then edit photos and videos — all in one app, built with Kotlin, Jetpack Compo
 | Camera | CameraX (core, camera2, lifecycle, view, video, extensions, effects) |
 | Navigation | Navigation Compose |
 | Video | Media3 1.11 (ExoPlayer, Transformer, Effect) |
-| Face / AR | ML Kit face detection |
+| Face / AR | ML Kit **unbundled** face detection + subject segmentation (models via Play Services) |
 | Colour pipeline | Custom 4×5 colour-matrix engine + `RenderEffect` / `RgbMatrix` |
 | SDK | min 24 · target 34 · compile 36 |
 | Build | Gradle 8.7, AGP 8.5.2, Kotlin 2.2.10 |
@@ -156,6 +156,85 @@ Every push to `main` builds a debug APK on GitHub Actions. Open the
 > environment blocks the wrapper, run `gradle wrapper` once to regenerate it.
 
 ---
+
+## 📦 Download size
+
+The APK is **~8 MB**, down from ~80 MB. There is no OBB and no expansion file.
+
+Where the bytes went:
+
+| | v1.2.0 | v1.3.0 |
+| --- | --- | --- |
+| Unminified dex | ~68 MB | minified by R8 |
+| ML Kit native libraries | ~48 MB (2 ABIs) | ~0.1 MB |
+| Bundled ML models | ~5 MB | 0 |
+| **Total APK** | **~80 MB** | **~8 MB** |
+
+Two changes did it:
+
+1. **Unbundled ML Kit.** Face detection and subject segmentation have a "thin" variant
+   whose models live in Google Play Services instead of inside the APK — face detection
+   drops from ~6.9 MB to ~0.8 MB of app size, and subject segmentation removes tens of
+   MB of native inference code in favour of ~200 KB. Same API, same behaviour; the model
+   is fetched by Play Services (at install time, via the manifest declaration).
+2. **R8 minification + resource shrinking**, which collapses the unminified dex.
+
+### Why not an OBB?
+
+An OBB (expansion file) is a Play Store mechanism — Play downloads it at install; the app
+cannot fetch its own. More importantly it cannot carry what actually made this APK big:
+
+- **Native `.so` libraries** can't be reliably loaded from an OBB. From Android 10 the
+  platform blocks `dlopen` of libraries from app-writable storage, so shipping ML inference
+  code in an OBB and loading it at runtime is not supported.
+- **ML Kit models** are read from the APK's assets. There is no supported way to point the
+  SDK at a downloaded file (ML Kit has explicitly said self-served model downloads are not
+  supported).
+
+So the OBB route would have been fragile and would not have removed the big items. The
+unbundled-model route reaches the same goal — a small APK whose heavy models are fetched
+by the platform — using a mechanism Google supports.
+
+**Trade-off:** the first use of face lenses or portrait depth needs Google Play Services
+and a one-time model download. Without them the app still runs; those two features just do
+nothing until the model lands.
+
+## 🔄 Content catalogue (update content without an app release)
+
+`content/catalog.json` is a **remote catalogue** of filters, sticker packs and AR lenses.
+The app fetches it at runtime (Content button in the camera top bar → *Sync now*), caches
+it, and merges it with its built-in content:
+
+- a remote entry whose `id` matches a built-in **replaces** it
+- a new `id` is **appended**
+- everything falls back to the built-ins, so the app works fully offline
+
+Edit the JSON, push, and every install picks it up on the next sync — no new APK.
+
+The schema is documented at the top of the file. Example:
+
+```json
+{
+  "filters": [
+    { "id": "aurora", "name": "Aurora", "category": "COOL",
+      "matrix": [0.95,0.05,0.05,0,4, 0.02,1.08,0.02,0,6, 0.05,0.05,1.15,0,10, 0,0,0,1,0] }
+  ],
+  "stickerPacks": [ { "name": "Remote Pack", "stickers": ["🛸", "🌌"] } ],
+  "lenses": [
+    { "id": "vapor", "name": "Vapor", "art": [
+      { "type": "drawn", "kind": "ROUND_GLASSES", "anchor": "EYE_MID", "size": 2.5 }
+    ] }
+  ]
+}
+```
+
+> **Note on size:** filters are 20 floats of data, so they cost essentially nothing in the
+> APK either way. The catalogue is about *updating content without a release*, not about
+> shrinking the download — that is handled by the unbundled models and R8 above.
+>
+> **Note on privacy:** the catalogue lives in this repo, so it is public. Making it truly
+> private would mean shipping a token inside the app, which anyone can extract — the usual
+> answer is a tiny backend that holds the secret. For content like filters, public is fine.
 
 ## 🗂️ Project structure
 
@@ -214,6 +293,8 @@ That single matrix is reused everywhere:
 - [ ] Non-destructive edit history with undo/redo
 - [ ] Video reverse effects, text/sticker overlays and transitions
 - [ ] Live filter + lens applied to the *recorded* video stream (not just the preview)
+- [x] Remote content catalogue (filters / stickers / lenses synced without an app release)
+- [x] Small APK via unbundled ML Kit + R8 (no OBB needed)
 - [ ] Custom filter creation and user presets
 - [ ] Direct share targets for specific social apps
 

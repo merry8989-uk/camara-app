@@ -24,6 +24,8 @@ These were the known gaps before v1.2.0:
 | 9 | No custom filters or saved user presets | planned |
 | 10 | No release signing (Play-ready AAB) | planned |
 | 11 | No direct share targets for specific apps | planned |
+| 12 | APK was ~80 MB | **done** (v1.3.0, now ~8 MB) |
+| 13 | No way to update content without a new APK | **done** (v1.3.0, remote catalogue) |
 
 ---
 
@@ -69,6 +71,39 @@ These were the known gaps before v1.2.0:
 - [x] Editor: filter strength, Portrait tool with live bokeh preview, tap-to-select
 
 ---
+
+## 2b. What v1.3.0 changes
+
+### Part 6 — APK size (~80 MB → ~8 MB)
+- [x] ML Kit switched to the **unbundled** variants: face detection and subject
+      segmentation models now live in Google Play Services instead of the APK
+      (~48 MB of native libraries and ~5 MB of models removed)
+- [x] **R8 minification + resource shrinking**, collapsing the unminified dex (~68 MB)
+- [x] Manifest declares `com.google.mlkit.vision.DEPENDENCIES` so Play Services can fetch
+      the models at install time
+- [x] ABIs limited to arm64-v8a + armeabi-v7a
+
+### Part 7 — Remote content catalogue
+- [x] `content/catalog.json` in the repo: filters, sticker packs and AR lenses
+- [x] `ContentStore` fetches, caches and merges remote content over the built-ins,
+      with full offline fallback
+- [x] Content dialog in the camera top bar: source URL, counts, last sync, *Sync now*
+- [x] Filters, stickers and lenses all read through the store
+
+### Why not an OBB
+
+An OBB is a Play Store mechanism (Play downloads it; the app can't), and it cannot carry
+what made the APK big:
+
+- Native `.so` files can't be `dlopen`ed from app-writable storage on Android 10+, so ML
+  inference code can't be shipped in an OBB and loaded at runtime.
+- ML Kit reads its models from the APK's assets; there is no supported way to point it at a
+  downloaded file (Google has said self-served model downloads are not supported).
+
+The unbundled-model route achieves the same outcome with a supported mechanism.
+
+**Trade-off:** first use of face lenses / portrait depth needs Play Services and a one-time
+model download. Everything else works offline.
 
 ## 3. Next up (planned)
 

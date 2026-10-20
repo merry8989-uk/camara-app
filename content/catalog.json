@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "updated": "2026-10-20",
+  "_comment": "Camara content catalogue. The app fetches this at runtime and merges it with its built-in content, so you can add or tweak filters, sticker packs and AR lenses without shipping a new APK. Filters with an id that already exists replace the built-in one; new ids are appended. Edit this file, push, and the app picks it up on the next sync. See PLAN.md for the schema.",
+  "filters": [
+    {
+      "id": "aurora",
+      "name": "Aurora",
+      "category": "COOL",
+      "matrix": [
+        0.95,
+        0.05,
+        0.05,
+        0,
+        4,
+        0.02,
+        1.08,
+        0.02,
+        0,
+        6,
+        0.05,
+        0.05,
+        1.15,
+        0,
+        10,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "ember",
+      "name": "Ember",
+      "category": "WARM",
+      "matrix": [
+        1.14,
+        0.02,
+        0.0,
+        0,
+        10,
+        0.02,
+        1.02,
+        0.0,
+        0,
+        2,
+        0.0,
+        0.0,
+        0.88,
+        0,
+        -6,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "neonpop",
+      "name": "Neon Pop",
+      "category": "SNAP",
+      "matrix": [
+        1.28,
+        -0.1,
+        -0.08,
+        0,
+        -4,
+        -0.08,
+        1.3,
+        -0.1,
+        0,
+        -4,
+        -0.08,
+        -0.1,
+        1.28,
+        0,
+        -4,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "noirblue",
+      "name": "Noir Blue",
+      "category": "MONO",
+      "matrix": [
+        0.32,
+        0.28,
+        0.22,
+        0,
+        0,
+        0.3,
+        0.34,
+        0.24,
+        0,
+        0,
+        0.32,
+        0.3,
+        0.44,
+        0,
+        8,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "terracotta",
+      "name": "Terracotta",
+      "category": "VINTAGE",
+      "matrix": [
+        1.08,
+        0.04,
+        0.0,
+        0,
+        6,
+        0.02,
+        0.98,
+        0.0,
+        0,
+        0,
+        0.0,
+        0.02,
+        0.88,
+        0,
+        -4,
+        0,
+        0,
+        0,
+        1,
+        0
+      ]
+    }
+  ],
+  "stickerPacks": [
+    {
+      "name": "Remote Pack",
+      "stickers": [
+        "🛸",
+        "🌌",
+        "🧊",
+        "🪐",
+        "🌠",
+        "🔮",
+        "🧿",
+        "🌵",
+        "🦋",
+        "🍄",
+        "🌊",
+        "🎐"
+      ]
+    }
+  ],
+  "lenses": [
+    {
+      "id": "aurora_halo",
+      "name": "Aurora",
+      "art": [
+        {
+          "type": "drawn",
+          "kind": "HALO",
+          "anchor": "FOREHEAD",
+          "dx": 0,
+          "dy": -0.8,
+          "size": 1.8
+        },
+        {
+          "type": "emoji",
+          "emoji": "✨",
+          "anchor": "CHEEK_LEFT",
+          "dx": -0.3,
+          "dy": 0.3,
+          "size": 0.75
+        },
+        {
+          "type": "emoji",
+          "emoji": "✨",
+          "anchor": "CHEEK_RIGHT",
+          "dx": 0.3,
+          "dy": 0.3,
+          "size": 0.75
+        },
+        {
+          "type": "emoji",
+          "emoji": "🌠",
+          "anchor": "FOREHEAD",
+          "dx": -1.4,
+          "dy": -0.1,
+          "size": 0.8
+        }
+      ]
+    },
+    {
+      "id": "vapor",
+      "name": "Vapor",
+      "art": [
+        {
+          "type": "drawn",
+          "kind": "ROUND_GLASSES",
+          "anchor": "EYE_MID",
+          "dx": 0,
+          "dy": 0,
+          "size": 2.5
+        },
+        {
+          "type": "drawn",
+          "kind": "BLUSH",
+          "anchor": "EYE_MID",
+          "dx": 0,
+          "dy": 0.85,
+          "size": 2.9
+        }
+      ]
+    },
+    {
+      "id": "rocket",
+      "name": "Liftoff",
+      "art": [
+        {
+          "type": "drawn",
+          "kind": "PARTY_HAT",
+          "anchor": "FOREHEAD",
+          "dx": 0,
+          "dy": -0.55,
+          "size": 1.7
+        },
+        {
+          "type": "emoji",
+          "emoji": "🚀",
+          "anchor": "EYE_LEFT",
+          "dx": -0.95,
+          "dy": -0.55,
+          "size": 0.9
+        },
+        {
+          "type": "emoji",
+          "emoji": "🔥",
+          "anchor": "EYE_RIGHT",
+          "dx": 0.95,
+          "dy": -0.55,
+          "size": 0.9
+        }
+      ]
+    }
+  ]
+}

@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.GridOff
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Slider
@@ -70,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.camara.app.content.ContentSyncDialog
 import com.camara.app.core.PhotoProcessor
 import com.camara.app.editor.image.ImageEditState
 import com.camara.app.lenses.LensOverlay
@@ -156,6 +158,7 @@ private fun CameraContent(
     var stickers by remember { mutableStateOf(listOf<PlacedSticker>()) }
     var countdown by remember { mutableIntStateOf(0) }
     var showTeleprompter by remember { mutableStateOf(false) }
+    var showContent by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         controller.attach(lifecycleOwner, previewView)
@@ -323,6 +326,12 @@ private fun CameraContent(
                     contentDescription = "Teleprompter",
                     selected = showTeleprompter,
                     onClick = { showTeleprompter = !showTeleprompter }
+                )
+                CircleIconButton(
+                    icon = Icons.Filled.Sync,
+                    contentDescription = "Content sync",
+                    selected = showContent,
+                    onClick = { showContent = true }
                 )
             }
         }
@@ -514,6 +523,10 @@ private fun CameraContent(
                 )
             }
         }
+    }
+
+    if (showContent) {
+        ContentSyncDialog(onDismiss = { showContent = false })
     }
 }
 

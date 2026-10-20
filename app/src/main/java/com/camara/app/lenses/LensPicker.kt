@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.camara.app.content.ContentStore
 import com.camara.app.ui.theme.Accent
 
 /** Horizontal lens picker. Each chip shows the lens name over a tinted swatch. */
@@ -37,7 +38,7 @@ fun LensPicker(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(LensCatalog.ALL, key = { it.id }) { lens ->
+        items(ContentStore.lenses, key = { it.id }) { lens ->
             val isSelected = lens.id == (selected?.id ?: LensCatalog.NONE.id)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

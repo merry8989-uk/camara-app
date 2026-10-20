@@ -2,12 +2,15 @@ package com.camara.app.ui.navigation
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.camara.app.camera.CameraScreen
+import com.camara.app.content.ContentStore
 import com.camara.app.editor.image.ImageEditorScreen
 import com.camara.app.editor.video.VideoEditorScreen
 import com.camara.app.gallery.GalleryScreen
@@ -30,6 +33,11 @@ object Routes {
 @Composable
 fun CamaraRoot() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+
+    // Bring in the cached content catalogue at startup so remotely-synced filters,
+    // sticker packs and lenses are available without waiting for a network call.
+    LaunchedEffect(Unit) { ContentStore.loadCache(context) }
 
     NavHost(
         navController = navController,

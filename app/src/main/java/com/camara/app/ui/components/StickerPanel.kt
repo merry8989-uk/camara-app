@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.camara.app.stickers.StickerPacks
+import com.camara.app.content.ContentStore
 import com.camara.app.ui.theme.Accent
 
 /** Tabbed sticker picker. Tapping a sticker emits its glyph to be placed. */
@@ -39,7 +39,8 @@ fun StickerPanel(
     modifier: Modifier = Modifier
 ) {
     var tab by remember { mutableIntStateOf(0) }
-    val pack = StickerPacks.PACKS[tab]
+    val packs = ContentStore.packs
+    val pack = packs[tab.coerceIn(0, (packs.size - 1).coerceAtLeast(0))]
 
     Column(
         modifier = modifier
@@ -54,7 +55,7 @@ fun StickerPanel(
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            StickerPacks.PACKS.forEachIndexed { index, p ->
+            packs.forEachIndexed { index, p ->
                 val selected = index == tab
                 Text(
                     p.name,

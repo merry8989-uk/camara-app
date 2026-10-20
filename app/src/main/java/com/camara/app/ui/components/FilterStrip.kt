@@ -32,9 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.camara.app.content.ContentStore
 import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterCategory
-import com.camara.app.filters.FilterPresets
 import com.camara.app.filters.FilterSwatch
 import com.camara.app.ui.theme.Accent
 import kotlin.math.roundToInt
@@ -53,7 +53,8 @@ fun FilterStrip(
     onIntensityChange: ((Float) -> Unit)? = null
 ) {
     var category by remember(selected) { mutableStateOf(selected.category) }
-    val filters = remember(category) { FilterPresets.inCategory(category) }
+    // Read through ContentStore so remotely-synced filters appear here too.
+    val filters = ContentStore.filtersIn(category)
 
     Column(modifier = modifier.fillMaxWidth()) {
         // ---- Category tabs ----
@@ -62,7 +63,7 @@ fun FilterStrip(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(bottom = 4.dp)
         ) {
-            items(FilterPresets.activeCategories(), key = { it.name }) { c ->
+            items(ContentStore.activeCategories(), key = { it.name }) { c ->
                 val isSelected = c == category
                 Text(
                     text = c.label,
