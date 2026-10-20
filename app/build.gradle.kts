@@ -17,6 +17,13 @@ android {
         versionName = "1.2.0"
 
         vectorDrawables { useSupportLibrary = true }
+
+        ndk {
+            // Ship the two ABIs real phones actually use. The x86/x86_64 emulator
+            // libraries roughly double the APK (ML models are ~20 MB per ABI) for no
+            // benefit on hardware.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
