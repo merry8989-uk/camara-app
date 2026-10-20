@@ -24,8 +24,9 @@ These were the known gaps before v1.2.0:
 | 9 | No custom filters or saved user presets | planned |
 | 10 | No release signing (Play-ready AAB) | planned |
 | 11 | No direct share targets for specific apps | planned |
-| 12 | APK was ~80 MB | **done** (v1.3.0, now ~8 MB) |
+| 12 | APK was ~80 MB | **done** (v1.3.0, now ~5 MB) |
 | 13 | No way to update content without a new APK | **done** (v1.3.0, remote catalogue) |
+| 14 | Every build was signed with a different key — updates needed an uninstall | **done** (v1.3.1) |
 
 ---
 
@@ -104,6 +105,18 @@ The unbundled-model route achieves the same outcome with a supported mechanism.
 
 **Trade-off:** first use of face lenses / portrait depth needs Play Services and a one-time
 model download. Everything else works offline.
+
+### Part 8 — Stable signing (v1.3.1)
+- [x] Committed a PKCS#12 signing keystore (`keystore/camara-dev.p12`), generated without a
+      JDK (this sandbox has none) using Python's `cryptography`
+- [x] Wired it into **both** build types so local and CI builds share one certificate
+- [x] CI now builds a **signed release APK** and verifies the v1 signature exists
+- [x] Certificate fingerprint verified programmatically against the keystore
+
+**Why it was broken:** CI runners start empty, so Gradle generated a fresh debug keystore
+per run. Different certificate → Android rejects the update → uninstall required.
+
+**Caveat:** the committed key is deliberately not secret (see `keystore/README.md`).
 
 ## 3. Next up (planned)
 
