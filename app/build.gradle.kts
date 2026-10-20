@@ -13,8 +13,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.3.0"
+        versionCode = 6
+        versionName = "1.3.1"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -26,13 +26,35 @@ android {
         }
     }
 
+    signingConfigs {
+        create("camara") {
+            // A THROWAWAY development key, committed on purpose so that every build
+            // (local and CI) is signed with the SAME certificate. Without this, each
+            // CI run generated a fresh debug key and Android refused to install an
+            // update over an existing install — you had to uninstall first.
+            //
+            // It is not a secret and must NEVER be used to publish a real app.
+            // Replace it with your own keystore and keep that one private.
+            storeFile = rootProject.file("keystore/camara-dev.p12")
+            storeType = "PKCS12"
+            storePassword = "camara123"
+            keyAlias = "camara"
+            keyPassword = "camara123"
+            // v1 signing is forced on so the signing certificate is inspectable
+            // (META-INF/CERT.RSA) and can be verified in CI.
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         // Minified on purpose: R8 cuts the (unminified) dex from ~68 MB to a few MB,
-        // which is the single biggest lever on the download size. The debug key keeps
-        // the signature stable between builds, so the sideloaded APK can be updated.
+        // which is the single biggest lever on the download size.
         debug {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("camara")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -41,6 +63,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("camara")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

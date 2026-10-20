@@ -43,12 +43,25 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+      # Signed with the committed throwaway key (keystore/camara-dev.p12) so every
+      # build carries the same certificate and installs can be updated in place.
+      - name: Build signed release APK
+        run: ./gradlew assembleRelease --stacktrace --no-daemon
+
+      - name: Verify signing certificate
+        run: |
+          set -e
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -n1)
+          echo "APK: $APK"
+          ls -l "$APK"
+          # v1 signing is enabled, so the signing cert is readable from META-INF.
+          unzip -l "$APK" | grep -i 'META-INF/.*\.RSA' || (echo 'No v1 signature found'; exit 1)
+          CERT=$(unzip -p "$APK" 'META-INF/*.RSA' | sha256sum | cut -d' ' -f1)
+          echo "META-INF signature blob sha256: $CERT"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: camara-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: camara-release-apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
