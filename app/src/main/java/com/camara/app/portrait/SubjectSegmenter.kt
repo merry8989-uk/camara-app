@@ -69,7 +69,7 @@ object SubjectSegmenter {
                 // The foreground mask is the same size as the input image.
                 val mw = work.width
                 val mh = work.height
-                val mask = result.foregroundConfidenceMask
+                val mask = result.foregroundConfidenceMask ?: return@withContext null
                 mask.rewind()
                 val confidence = FloatArray(mw * mh)
                 mask.get(confidence)
