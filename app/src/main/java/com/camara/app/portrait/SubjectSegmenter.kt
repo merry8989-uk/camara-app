@@ -6,23 +6,26 @@ import androidx.compose.ui.geometry.Offset
 import com.camara.app.util.Blur
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.Segmentation
-import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 /**
- * Separates the subject from the background using ML Kit's on-device selfie
- * segmenter, then turns the confidence map into a soft alpha mask.
+ * Separates subjects from the background using ML Kit's on-device **subject
+ * segmentation** — which recognises people, pets *and* objects, not just selfies.
  *
  * The user can tap a point to choose *which* subject stays sharp: we keep the
  * connected blob of foreground under the tap and drop the rest. Without a tap we
  * keep the largest blob.
  *
- * Work happens on a downscaled copy — the mask only needs to be smooth, not
- * pixel-exact — which keeps it fast and light on memory.
+ * The model is unbundled — it lives in Google Play Services and is downloaded on
+ * first use, which keeps the APK small. Work happens on a downscaled copy because
+ * the mask only needs to be smooth, not pixel-exact.
+ *
+ * Requires API 24+ and, for good accuracy, an input of at least 512x512.
  */
 object SubjectSegmenter {
 
@@ -45,15 +48,15 @@ object SubjectSegmenter {
                     bitmap
                 }
 
-                val segmenter = Segmentation.getClient(
-                    SelfieSegmenterOptions.Builder()
-                        .setDetectorMode(SelfieSegmenterOptions.SINGLE_IMAGE_MODE)
+                val segmenter = SubjectSegmentation.getClient(
+                    SubjectSegmenterOptions.Builder()
+                        .enableForegroundConfidenceMask()
                         .build()
                 )
-                val mask = try {
+                val result = try {
                     Tasks.await(
                         segmenter.process(InputImage.fromBitmap(work, 0)),
-                        8,
+                        10,
                         TimeUnit.SECONDS
                     )
                 } finally {
@@ -63,12 +66,13 @@ object SubjectSegmenter {
                     }
                 }
 
-                val mw = mask.width
-                val mh = mask.height
-                val buffer = mask.buffer
-                buffer.rewind()
+                // The foreground mask is the same size as the input image.
+                val mw = work.width
+                val mh = work.height
+                val mask = result.foregroundConfidenceMask
+                mask.rewind()
                 val confidence = FloatArray(mw * mh)
-                buffer.asFloatBuffer().get(confidence)
+                mask.get(confidence)
 
                 // Confidence -> alpha with a smooth ramp, so edges stay soft.
                 val alpha = IntArray(mw * mh)
@@ -114,7 +118,6 @@ object SubjectSegmenter {
         val stack = IntArray(n)
         val scratch = IntArray(n)
 
-        // Fills `scratch` with the blob reachable from `start`; returns its size.
         fun flood(start: Int): Int {
             var top = 0
             var count = 0
@@ -141,14 +144,11 @@ object SubjectSegmenter {
             return count
         }
 
-        fun materialise(count: Int): IntArray {
+        if (seed in 0 until n && alpha[seed] > 0) {
+            val count = flood(seed)
             val out = IntArray(n)
             for (i in 0 until count) out[scratch[i]] = alpha[scratch[i]]
             return out
-        }
-
-        if (seed in 0 until n && alpha[seed] > 0) {
-            return materialise(flood(seed))
         }
 
         var bestCount = 0

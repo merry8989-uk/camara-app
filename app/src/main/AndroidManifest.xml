@@ -47,6 +47,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Ask Play Services to fetch the unbundled ML Kit models at install time so
+             face lenses and portrait depth work on first launch. Without this they are
+             downloaded the first time each feature is used. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="face,subject_segment" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -27,8 +27,20 @@ android {
     }
 
     buildTypes {
+        // Minified on purpose: R8 cuts the (unminified) dex from ~68 MB to a few MB,
+        // which is the single biggest lever on the download size. The debug key keeps
+        // the signature stable between builds, so the sideloaded APK can be updated.
+        debug {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -87,11 +99,12 @@ dependencies {
     implementation("androidx.media3:media3-common:$media3")
     implementation("androidx.media3:media3-ui:$media3")
 
-    // On-device face detection (AR lenses, face-only beauty)
-    implementation("com.google.mlkit:face-detection:16.1.7")
-
-    // On-device subject/background segmentation (portrait bokeh)
-    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    // ML Kit, unbundled ("thin") variants: the models live in Google Play Services
+    // instead of inside the APK. Same API, but face detection drops from ~6.9 MB to
+    // ~0.8 MB of app size and subject segmentation from tens of MB of native code to
+    // ~200 KB. The model downloads on first use (or at install time, see the manifest).
+    implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
+    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
 
     // EXIF orientation handling
     implementation("androidx.exifinterface:exifinterface:1.3.7")
