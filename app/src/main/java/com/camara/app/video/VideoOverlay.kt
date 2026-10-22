@@ -123,25 +123,36 @@ object VideoOverlays {
         return out
     }
 
-    /**
-     * A [BitmapOverlay] that is only drawn between two timestamps.
-     *
-     * Returning null outside the window is how Media3's own TextOverlay and DrawableOverlay
-     * do it, so the texture cache stays correct.
-     */
-    private class TimedOverlay(
-        private val frame: Bitmap,
-        private val startMs: Float,
-        private val endMs: Float,
-    ) : BitmapOverlay(frame) {
+}
 
-        override fun getBitmap(presentationTimeUs: Long): Bitmap? {
-            val ms = presentationTimeUs / 1000f
-            return if (ms >= startMs && ms <= endMs) frame else null
-        }
+/** One shared transparent pixel, used to hide an overlay outside its time window. */
+@Volatile
+private var blankPixel: Bitmap? = null
 
-        override fun getWidth(): Int = frame.width
+private fun blankPixel(): Bitmap {
+    blankPixel?.let { return it }
+    val made = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    made.eraseColor(0)
+    blankPixel = made
+    return made
+}
 
-        override fun getHeight(): Int = frame.height
+/**
+ * A [BitmapOverlay] that is only drawn between two timestamps.
+ *
+ * `getBitmap` cannot return null, so outside the window it returns a single fully
+ * transparent pixel — invisible, and the texture cache sees a different generation id and
+ * swaps correctly.
+ */
+@OptIn(UnstableApi::class)
+private class TimedOverlay(
+    private val frame: Bitmap,
+    private val startMs: Float,
+    private val endMs: Float,
+) : BitmapOverlay() {
+
+    override fun getBitmap(presentationTimeUs: Long): Bitmap {
+        val ms = presentationTimeUs / 1000f
+        return if (ms >= startMs && ms <= endMs) frame else blankPixel()
     }
 }
