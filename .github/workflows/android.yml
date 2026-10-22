@@ -126,10 +126,20 @@ jobs:
           set -e
           TAG="${GITHUB_REF_NAME}"
           ls -l dist
+
+          # A release may already exist: created as a draft so the notes can be written by
+          # hand. In that case attach the APK and publish it, rather than leaving the
+          # draft without an asset.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists — leaving it alone."
+            echo "Release $TAG exists — attaching the APK."
+            gh release upload "$TAG" dist/*.apk --repo "$GITHUB_REPOSITORY" --clobber
+            if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft)" = "true" ]; then
+              echo "Publishing the draft."
+              gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+            fi
             exit 0
           fi
+
           gh release create "$TAG" dist/*.apk \
             --repo "$GITHUB_REPOSITORY" \
             --title "Camara $TAG" \
