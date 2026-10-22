@@ -14,11 +14,13 @@ import com.camara.app.content.ContentStore
 import com.camara.app.editor.image.ImageEditorScreen
 import com.camara.app.editor.video.VideoEditorScreen
 import com.camara.app.gallery.GalleryScreen
+import com.camara.app.settings.SettingsScreen
 import com.camara.app.teleprompter.TeleprompterScreen
 
 /** Every navigation route in the app, in one place. */
 object Routes {
     const val CAMERA = "camera"
+    const val SETTINGS = "settings"
     const val GALLERY = "gallery"
     const val TELEPROMPTER = "teleprompter"
     const val IMAGE_EDITOR = "image_editor"
@@ -48,8 +50,13 @@ fun CamaraRoot() {
                 onOpenGallery = { navController.navigate(Routes.GALLERY) },
                 onEditPhoto = { uri -> navController.navigate(Routes.imageEditor(uri)) },
                 onEditVideo = { uri -> navController.navigate(Routes.videoEditor(uri)) },
-                onOpenTeleprompter = { navController.navigate(Routes.TELEPROMPTER) }
+                onOpenTeleprompter = { navController.navigate(Routes.TELEPROMPTER) },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) }
             )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.GALLERY) {

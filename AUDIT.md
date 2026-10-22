@@ -7,6 +7,32 @@ Status key: **fixed** · **in progress** · **planned**
 
 ---
 
+## App Factory compliance
+
+The App Factory skill defines a fixed Definition of Done for every app. Camara's status
+against it:
+
+| # | Requirement | Status |
+| --- | --- | --- |
+| 1 | Public repo under the user's account | ✅ `merry8989-uk/camara-app` |
+| 2 | Release keystore, backed up, repo secret, never committed | ✅ v1.4.0 |
+| 3 | Package ID fixed and documented | ✅ `com.camara.app` |
+| 4 | Builds green via CI | ✅ |
+| 5 | Signed release + tag + notes, published automatically | ✅ build job + tag-triggered publish job |
+| 6 | Full-screen / immersive mode | ✅ v1.5.0 (toggle in Settings) |
+| 7 | Rich Settings screen, wired, persistent | ✅ v1.5.0 (DataStore) |
+| 8 | Update installs over the previous version | ✅ |
+| 9 | Public GitHub Pages page documenting every feature | ✅ v1.5.0 (`docs/`) |
+| 10 | Settings ends with a tappable @osintgram_io link | ✅ v1.5.0 |
+| 11 | In-app "Check for updates" installs without a browser | ✅ v1.5.0 |
+| 12 | Diagnostics section, log collection on by default | ✅ v1.5.0 |
+| 13 | Logs shared / exported (.txt/.json/.md/.zip) / cleared | ✅ v1.5.0 |
+
+Rule 1 was also tightened: a release build with no signing key now fails hard instead of
+silently producing an unsigned APK.
+
+---
+
 ## Findings
 
 ### 🔴 P0 — real bugs (wrong behaviour or crashes)

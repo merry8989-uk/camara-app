@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Camara — camera, filters, editing</title>
+<meta name="description" content="Camara is an Android camera app: 75+ filters, AR lenses, face-only beauty, portrait depth, stickers, a teleprompter, and full photo and video editors." />
+<style>
+  :root{
+    --bg:#0B0B0F; --surface:#141419; --elev:#1D1D24; --line:#2A2A33;
+    --text:#F5F5F7; --muted:#9A9AA5; --accent:#FF2D78; --accent2:#7C4DFF;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#FAFAFC; --surface:#FFFFFF; --elev:#F1F1F5; --line:#E2E2EA;
+           --text:#111114; --muted:#5A5A66; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px}
+  header{padding:64px 0 40px;text-align:center;border-bottom:1px solid var(--line)}
+  h1{font-size:clamp(32px,6vw,52px);margin:0 0 12px;letter-spacing:-0.02em}
+  h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));
+          -webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{color:var(--muted);font-size:18px;margin:0 auto;max-width:560px}
+  .badges{margin-top:22px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .badge{background:var(--elev);border:1px solid var(--line);border-radius:999px;
+         padding:6px 14px;font-size:13px;color:var(--muted)}
+  .cta{margin-top:28px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;padding:13px 26px;border-radius:12px;font-weight:600;
+       text-decoration:none;border:1px solid var(--line);color:var(--text);background:var(--surface)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  h2{font-size:26px;margin:56px 0 8px;letter-spacing:-0.01em}
+  h3{font-size:17px;margin:26px 0 6px}
+  .lead{color:var(--muted);margin:0 0 18px}
+  section{padding-bottom:8px}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-top:18px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .card h4{margin:0 0 6px;font-size:15px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  ul{color:var(--muted);padding-left:20px}
+  li{margin:5px 0}
+  li b{color:var(--text);font-weight:600}
+  code{background:var(--elev);border:1px solid var(--line);border-radius:6px;
+       padding:1px 6px;font-size:13px}
+  ol{color:var(--muted);padding-left:22px}
+  footer{margin-top:70px;padding:36px 0 60px;border-top:1px solid var(--line);text-align:center}
+  .handle{font-size:20px;font-weight:700;color:var(--accent);text-decoration:none;
+          display:inline-block;margin:8px 0}
+  .handle:hover{text-decoration:underline}
+  .fine{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Camara<span>.</span></h1>
+    <p class="tag">A camera app that actually edits. 75+ filters, AR lenses, face-only
+      beauty, real portrait depth, a teleprompter, and full photo and video editors —
+      all on device.</p>
+    <div class="badges">
+      <span class="badge">Android 7.0+</span>
+      <span class="badge">~5 MB</span>
+      <span class="badge">On-device processing</span>
+      <span class="badge">No account needed</span>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/merry8989-uk/camara-app/releases/latest">Download the latest APK</a>
+      <a class="btn" href="https://github.com/merry8989-uk/camara-app">Source on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <h2>Install</h2>
+  <ol>
+    <li>Open the <a href="https://github.com/merry8989-uk/camara-app/releases/latest">latest release</a>
+        and download the <code>.apk</code>.</li>
+    <li>Tap it. Android will ask you to allow <b>Install unknown apps</b> for your browser or
+        file manager — allow it, then install.</li>
+    <li>Grant camera and microphone access when asked. Without camera access the app cannot
+        open; the permission screen has an <b>Open app settings</b> button if you deny it twice.</li>
+  </ol>
+  <p class="lead">Updates install straight over the current version — no uninstall. You can
+     also update from inside the app: <b>Settings → Updates → Check for updates</b>.</p>
+</section>
+
+<section>
+  <h2>Camera</h2>
+  <p class="lead">The capture screen is the app's home. Everything below is reachable from it.</p>
+  <div class="grid">
+    <div class="card"><h4>Photo and video modes</h4><p>Switch between still capture and video
+      recording. Video records with audio when the microphone permission is granted, and
+      silently when it is not.</p></div>
+    <div class="card"><h4>Front / rear camera</h4><p>One tap to switch lenses. Front-camera
+      photos can be saved mirrored the way you see them, controlled from Settings.</p></div>
+    <div class="card"><h4>Flash</h4><p>Off, auto, or always on.</p></div>
+    <div class="card"><h4>Timer</h4><p>Off, 3, 5 or 10 seconds, with a visible countdown
+      before the shutter fires. The default is set in Settings.</p></div>
+    <div class="card"><h4>Composition grid</h4><p>A rule-of-thirds overlay, toggleable, and
+      optionally on by default.</p></div>
+    <div class="card"><h4>Pinch to zoom</h4><p>Continuous zoom with a live level indicator.</p></div>
+    <div class="card"><h4>Tap to focus</h4><p>Tap anywhere on the preview to focus and meter
+      there. In Portrait mode a tap picks the subject instead.</p></div>
+    <div class="card"><h4>Gallery shortcut</h4><p>Jump straight to the last thing you shot.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Filters</h2>
+  <p class="lead">Around 75 filters, grouped into categories so you can find one without
+     scrolling forever.</p>
+  <ul>
+    <li><b>Categories</b> — Original, Portrait, Classic, Warm, Cool, Mono, Cinematic,
+        Vintage, Snap, Social. The category strip stays where you put it.</li>
+    <li><b>Strength slider</b> — every filter blends from untouched to full, so you can dial
+        an effect back instead of abandoning it.</li>
+    <li><b>Live preview</b> — what you see on screen is what gets captured.</li>
+    <li><b>Remote catalogue</b> — the filter list is synced from this repository, so new
+        filters arrive without an app update. Settings → the sync button on the camera
+        top bar pulls the latest.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>AR lenses</h2>
+  <p class="lead">Face-tracked effects that follow your head, anchored to real landmarks
+     rather than floating in a fixed spot.</p>
+  <ul>
+    <li><b>Landmark anchoring</b> — effects scale with the distance between your eyes and
+        rotate with your eye line, so they sit correctly instead of sliding around.</li>
+    <li><b>28+ lenses</b> across styles, from subtle to silly.</li>
+    <li><b>Honest about limits</b> — if a lens can't run in the current camera mode, or the
+        models behind it aren't available on your device, the app says so rather than
+        silently doing nothing.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Beauty and retouch</h2>
+  <p class="lead">Beauty applies <b>to the face only</b> — skin smoothing and skin-tone work
+     through a feathered face mask, so the background, clothes and hair are untouched.</p>
+  <ul>
+    <li><b>Smooth</b> — softens skin texture without flattening detail.</li>
+    <li><b>Brighten</b> — lifts the face out of shadow.</li>
+    <li><b>Warmth</b> — warmer or cooler skin tone.</li>
+    <li><b>Skin tone</b> — shifts the face's colour balance.</li>
+    <li><b>Slim face</b> — a gentle horizontal squeeze inside the face oval.</li>
+    <li><b>Enlarge eyes</b> — a localised, symmetric eye magnification.</li>
+    <li><b>Sharpen</b> — brings back detail after smoothing.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Portrait depth</h2>
+  <p class="lead">Real background blur with a subject you choose — not a fixed vignette.</p>
+  <ul>
+    <li><b>Tap to select</b> — tap the thing you want sharp; everything else blurs.</li>
+    <li><b>Works on people, pets and objects</b>, not just faces.</li>
+    <li><b>Adjustable strength</b>, and it is baked into the saved photo, not just the preview.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Stickers</h2>
+  <p class="lead">Place stickers on the live camera preview, then drag and resize them.
+     They are composited into the photo you save.</p>
+</section>
+
+<section>
+  <h2>Teleprompter</h2>
+  <p class="lead">A transparent, draggable script overlay that sits <b>on the camera
+     screen</b>, so you can read it while looking at yourself and stay on camera.</p>
+  <ul>
+    <li><b>Adjustable scroll speed</b> and text size.</li>
+    <li><b>Transparent</b> — you can see yourself through it while recording.</li>
+    <li><b>Draggable</b> — put it wherever it doesn't block your framing.</li>
+    <li>Also available full-screen, for reading away from the camera.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Photo editor</h2>
+  <p class="lead">Open anything from the gallery and edit it properly.</p>
+  <div class="grid">
+    <div class="card"><h4>Crop</h4><p>Freeform crop with draggable corners.</p></div>
+    <div class="card"><h4>Rotate and flip</h4><p>90° rotation plus horizontal and vertical flips.</p></div>
+    <div class="card"><h4>Adjust</h4><p>Brightness, contrast, saturation, warmth and more.</p></div>
+    <div class="card"><h4>Filters</h4><p>The same catalogue as the camera, with the strength slider.</p></div>
+    <div class="card"><h4>Text</h4><p>Add captions and move them into place.</p></div>
+    <div class="card"><h4>Draw</h4><p>Scribble on the photo with a colour picker.</p></div>
+    <div class="card"><h4>Frames</h4><p>Borders and edges to finish a shot.</p></div>
+    <div class="card"><h4>Portrait depth</h4><p>Tap to pick a subject and blur the rest, after the fact.</p></div>
+    <div class="card"><h4>Undo and redo</h4><p>Take back any change. A slider drag undoes in
+      one step rather than a hundred.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Video editor</h2>
+  <ul>
+    <li><b>Trim</b> — set the start and end of the clip.</li>
+    <li><b>Speed</b> — slow motion and time-lapse, with per-segment speed changes.</li>
+    <li><b>Filters</b> — grade the footage with the same catalogue.</li>
+    <li><b>Export</b> — renders to your gallery, then share it straight from the app.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Gallery</h2>
+  <p class="lead">Your photos and videos in a fast grid, with one-tap edit and share.
+     Read access is requested only for the media permissions your Android version requires.</p>
+</section>
+
+<section>
+  <h2>Settings</h2>
+  <p class="lead">Every option persists and takes effect immediately. No dead toggles.</p>
+
+  <h3>Appearance</h3>
+  <ul>
+    <li><b>Theme</b> — light, dark, or follow the system.</li>
+    <li><b>Accent colour</b> — five choices, applied across the app.</li>
+    <li><b>Text size</b> and <b>density</b> — scale the whole interface.</li>
+  </ul>
+
+  <h3>General</h3>
+  <ul>
+    <li><b>Language</b> — system, English or Hindi.</li>
+    <li><b>Notifications</b> — tips and release announcements.</li>
+    <li><b>Full-screen mode</b> — hide the status and navigation bars while using Camara.</li>
+    <li><b>Mirror selfie</b> — save front-camera photos the way you see them.</li>
+    <li><b>Grid by default</b> — open the camera with the composition grid already on.</li>
+    <li><b>Default timer</b> — off, 3, 5 or 10 seconds.</li>
+  </ul>
+
+  <h3>Features</h3>
+  <p class="lead">Switch off anything you don't use and its control disappears from the camera:
+     Filters, Stickers, Beauty, AR lenses, Portrait depth, Teleprompter.</p>
+
+  <h3>Updates</h3>
+  <p class="lead">Shows the installed version and a <b>Check for updates</b> button. When a
+     newer release exists, <b>Update now</b> downloads the signed APK and hands it to the
+     installer — no browser.</p>
+
+  <h3>Diagnostics</h3>
+  <p class="lead">Log collection is <b>on by default</b>, including uncaught crashes, so a
+     problem can be diagnosed without reproducing it first. You can share the log, export it
+     as <code>.txt</code>, <code>.json</code>, <code>.md</code> or <code>.zip</code>, or clear
+     it. Turning collection off stops new entries but still lets you export what exists.</p>
+
+  <h3>Reset</h3>
+  <p class="lead">Reset every setting back to its default.</p>
+</section>
+
+<section>
+  <h2>How it is built</h2>
+  <ul>
+    <li><b>Kotlin and Jetpack Compose</b>, CameraX for capture, Media3 for video.</li>
+    <li><b>On-device machine learning</b> — face detection and subject segmentation run on the
+        phone. Photos are not uploaded anywhere.</li>
+    <li><b>Small on purpose</b> — the ML models live in Google Play Services and download on
+        first use, which keeps the APK around 5 MB instead of 80 MB. Face lenses, face beauty
+        and portrait depth need Play Services as a result; everything else works offline.</li>
+    <li><b>Signed releases</b> — every build is signed with the same key, so updates install
+        in place.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Requirements and known limits</h2>
+  <ul>
+    <li>Android 7.0 (API 24) or newer. arm64 and armeabi-v7a devices.</li>
+    <li>Face lenses, face beauty and portrait depth need Google Play Services. The app tells
+        you when they aren't available instead of failing silently.</li>
+    <li>The live look applies to the preview and to saved photos; it is not yet baked into
+        recorded video.</li>
+    <li>The video editor does not yet do text overlays, stickers or transitions.</li>
+  </ul>
+</section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <p class="fine">Suggestions, feedback or a feature request?</p>
+    <a class="handle" href="https://instagram.com/osintgram_io">@osintgram_io</a>
+    <p class="fine">Message the handle above and tell me what to build next.</p>
+    <p class="fine" style="margin-top:18px">
+      <a href="https://github.com/merry8989-uk/camara-app">Source</a> ·
+      <a href="https://github.com/merry8989-uk/camara-app/releases/latest">Releases</a> ·
+      MIT licensed
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

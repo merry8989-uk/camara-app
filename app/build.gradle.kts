@@ -23,6 +23,22 @@ if (camaraKeystoreFile == null) {
     logger.lifecycle("[camara] Signing with ${camaraKeystoreFile.absolutePath}")
 }
 
+// App Factory Rule 1: never ship a release without the real signing key.
+//
+// Checked against the task graph rather than at configuration time, so a fresh clone can
+// still build debug without the keystore — but any release task without a key fails hard
+// instead of quietly producing an unsigned APK.
+gradle.taskGraph.whenReady {
+    val wantsRelease = allTasks.any { it.name.contains("Release", ignoreCase = true) }
+    if (wantsRelease && camaraKeystoreFile == null) {
+        throw GradleException(
+            "Refusing to build a release: no signing keystore found. Set CAMARA_KEYSTORE " +
+                "(CI decodes it from the CAMARA_KEYSTORE_BASE64 secret), or place the key at " +
+                "keystore/camara-dev.p12. An unsigned release is not allowed."
+        )
+    }
+}
+
 android {
     namespace = "com.camara.app"
     // Media3 1.10+ requires compiling against API 36.
@@ -32,8 +48,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.4.2"
+        versionCode = 10
+        versionName = "1.5.0"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -79,10 +95,6 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             if (camaraKeystoreFile != null) signingConfig = signingConfigs.getByName("camara")
-            // Fail loudly rather than shipping a silently-unsigned release APK.
-            if (System.getenv("CAMARA_REQUIRE_SIGNING") == "true" && camaraKeystoreFile == null) {
-                throw GradleException("CAMARA_REQUIRE_SIGNING=true but no signing keystore was found.")
-            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -97,7 +109,12 @@ android {
 
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        // Needed for BuildConfig.VERSION_NAME, which the in-app updater compares against
+        // the latest release tag (App Factory Rule 6).
+        buildConfig = true
+    }
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
@@ -113,6 +130,9 @@ dependencies {
 
     // Core + lifecycle + activity
     implementation("androidx.core:core-ktx:1.13.1")
+    // Settings persistence (App Factory Rule 4: every setting persists and applies now)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")

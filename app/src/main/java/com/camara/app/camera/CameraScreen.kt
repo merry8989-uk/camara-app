@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GridOff
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Timer
@@ -54,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -77,6 +79,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.camara.app.content.ContentSyncDialog
 import com.camara.app.core.ModelSupport
 import com.camara.app.core.PhotoProcessor
+import com.camara.app.settings.FeatureFlag
+import com.camara.app.settings.SettingsRepository
+import com.camara.app.settings.SettingsState
 import com.camara.app.editor.image.ImageEditState
 import com.camara.app.lenses.LensOverlay
 import com.camara.app.lenses.LensPicker
@@ -108,7 +113,8 @@ fun CameraScreen(
     onOpenGallery: () -> Unit,
     onEditPhoto: (Uri) -> Unit,
     onEditVideo: (Uri) -> Unit,
-    onOpenTeleprompter: () -> Unit
+    onOpenTeleprompter: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(hasCameraPermission(context)) }
@@ -132,7 +138,8 @@ fun CameraScreen(
         onOpenGallery = onOpenGallery,
         onEditPhoto = onEditPhoto,
         onEditVideo = onEditVideo,
-        onOpenTeleprompter = onOpenTeleprompter
+        onOpenTeleprompter = onOpenTeleprompter,
+        onOpenSettings = onOpenSettings
     )
 }
 
@@ -141,9 +148,14 @@ private fun CameraContent(
     onOpenGallery: () -> Unit,
     onEditPhoto: (Uri) -> Unit,
     onEditVideo: (Uri) -> Unit,
-    onOpenTeleprompter: () -> Unit
+    onOpenTeleprompter: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val context = LocalContext.current
+    // Settings drive which capture tools are shown and how the camera starts up
+    // (App Factory Rule 4: every toggle has a real effect).
+    val settingsRepo = remember { SettingsRepository(context) }
+    val settings by settingsRepo.settings.collectAsState(initial = SettingsState())
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
@@ -352,35 +364,51 @@ private fun CameraContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (settings.isEnabled(FeatureFlag.FILTERS)) {
+                CircleIconButton(
+                    icon = Icons.Filled.AutoAwesome,
+                    contentDescription = "Filters",
+                    selected = panel == CameraPanel.FILTERS,
+                    onClick = { panel = if (panel == CameraPanel.FILTERS) CameraPanel.NONE else CameraPanel.FILTERS }
+                )
+            }
+            if (settings.isEnabled(FeatureFlag.STICKERS)) {
+                CircleIconButton(
+                    icon = Icons.Filled.EmojiEmotions,
+                    contentDescription = "Stickers",
+                    selected = panel == CameraPanel.STICKERS,
+                    onClick = { panel = if (panel == CameraPanel.STICKERS) CameraPanel.NONE else CameraPanel.STICKERS }
+                )
+            }
+            if (settings.isEnabled(FeatureFlag.BEAUTY)) {
+                CircleIconButton(
+                    icon = Icons.Filled.FaceRetouchingNatural,
+                    contentDescription = "Beauty",
+                    selected = panel == CameraPanel.BEAUTY,
+                    onClick = { panel = if (panel == CameraPanel.BEAUTY) CameraPanel.NONE else CameraPanel.BEAUTY }
+                )
+            }
+            if (settings.isEnabled(FeatureFlag.PORTRAIT)) {
+                CircleIconButton(
+                    icon = Icons.Filled.FilterFrames,
+                    contentDescription = "Portrait depth",
+                    selected = panel == CameraPanel.PORTRAIT,
+                    onClick = { panel = if (panel == CameraPanel.PORTRAIT) CameraPanel.NONE else CameraPanel.PORTRAIT }
+                )
+            }
+            if (settings.isEnabled(FeatureFlag.LENSES)) {
+                CircleIconButton(
+                    icon = Icons.Filled.Face,
+                    contentDescription = "Lenses",
+                    selected = panel == CameraPanel.LENSES,
+                    onClick = { panel = if (panel == CameraPanel.LENSES) CameraPanel.NONE else CameraPanel.LENSES }
+                )
+            }
             CircleIconButton(
-                icon = Icons.Filled.AutoAwesome,
-                contentDescription = "Filters",
-                selected = panel == CameraPanel.FILTERS,
-                onClick = { panel = if (panel == CameraPanel.FILTERS) CameraPanel.NONE else CameraPanel.FILTERS }
-            )
-            CircleIconButton(
-                icon = Icons.Filled.EmojiEmotions,
-                contentDescription = "Stickers",
-                selected = panel == CameraPanel.STICKERS,
-                onClick = { panel = if (panel == CameraPanel.STICKERS) CameraPanel.NONE else CameraPanel.STICKERS }
-            )
-            CircleIconButton(
-                icon = Icons.Filled.FaceRetouchingNatural,
-                contentDescription = "Beauty",
-                selected = panel == CameraPanel.BEAUTY,
-                onClick = { panel = if (panel == CameraPanel.BEAUTY) CameraPanel.NONE else CameraPanel.BEAUTY }
-            )
-            CircleIconButton(
-                icon = Icons.Filled.FilterFrames,
-                contentDescription = "Portrait depth",
-                selected = panel == CameraPanel.PORTRAIT,
-                onClick = { panel = if (panel == CameraPanel.PORTRAIT) CameraPanel.NONE else CameraPanel.PORTRAIT }
-            )
-            CircleIconButton(
-                icon = Icons.Filled.Face,
-                contentDescription = "Lenses",
-                selected = panel == CameraPanel.LENSES,
-                onClick = { panel = if (panel == CameraPanel.LENSES) CameraPanel.NONE else CameraPanel.LENSES }
+                icon = Icons.Filled.Settings,
+                contentDescription = "Settings",
+                selected = false,
+                onClick = onOpenSettings
             )
         }
 
