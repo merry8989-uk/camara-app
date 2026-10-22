@@ -35,28 +35,34 @@ object PhotoProcessor {
         edit: ImageEditState,
         lens: Lens? = null
     ): Bitmap = withContext(Dispatchers.Default) {
-        var bmp = ImageExporter.renderGeometry(source, edit)
+        // Each stage returns a new bitmap and the previous one is finished with, so it is
+        // released as we go — otherwise a full export holds six full-size bitmaps at once,
+        // which is enough to OOM a 2 GB device on a 12 MP photo. `source` belongs to the
+        // caller and is never released. See [ReleasingChain].
+        val chain = ReleasingChain(source) { it.recycle() }
+        chain.advance(ImageExporter.renderGeometry(source, edit))
 
         val lensActive = lens != null && lens.art.isNotEmpty()
         val needsFace = !edit.beauty.isDefault || lensActive
-        val face = if (needsFace) FaceMasker.detectFace(bmp) else null
+        val face = if (needsFace) FaceMasker.detectFace(chain.value) else null
 
         if (!edit.beauty.isDefault) {
-            bmp = FaceBeauty.apply(bmp, edit.beauty, face)
+            chain.advance(FaceBeauty.apply(chain.value, edit.beauty, face))
         }
 
-        bmp = ImageExporter.renderColour(bmp, edit)
+        chain.advance(ImageExporter.renderColour(chain.value, edit))
 
         if (edit.portrait.enabled) {
-            val mask = SubjectSegmenter.subjectMask(context, bmp, edit.portrait.subjectPoint)
-            bmp = PortraitBokeh.apply(bmp, mask, edit.portrait.strength)
+            val mask = SubjectSegmenter.subjectMask(context, chain.value, edit.portrait.subjectPoint)
+            chain.advance(PortraitBokeh.apply(chain.value, mask, edit.portrait.strength))
             mask?.recycle()
         }
 
         if (lensActive && face != null) {
-            bmp = LensRenderer.bake(bmp, lens!!, face)
+            chain.advance(LensRenderer.bake(chain.value, lens!!, face))
         }
 
-        ImageExporter.renderOverlays(bmp, edit)
+        chain.advance(ImageExporter.renderOverlays(chain.value, edit))
+        chain.value
     }
 }

@@ -21,6 +21,9 @@ object FaceBeauty {
         val mask = FaceMasker.buildMask(src, face)
         val result = MaskCompositor.maskOver(src, full, mask)
         mask.recycle()
+        // `full` was only an input to the compositor — release it unless the compositor
+        // handed it straight back (in which case it is the result and must survive).
+        if (result !== full) full.recycle()
         return result
     }
 }

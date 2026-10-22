@@ -103,6 +103,17 @@ class CameraController(private val context: Context) {
         }, executor)
     }
 
+    /**
+     * Attaches the face analyzer. It is only attached while a lens is active, so frames
+     * aren't analysed (and the model isn't run) when nothing needs them.
+     */
+    private fun attachAnalyzer(analysis: ImageAnalysis) {
+        analysis.setAnalyzer(analysisExecutor, FaceAnalyzer { face ->
+            // Hop to the main thread before writing Compose state.
+            executor.execute { if (lensesEnabled) faceState = face }
+        })
+    }
+
     private fun rebind() {
         val p = provider ?: return
         val owner = lifecycleOwner ?: return
@@ -141,32 +152,27 @@ class CameraController(private val context: Context) {
                 .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-            analysis.setAnalyzer(analysisExecutor, FaceAnalyzer { face ->
-                // Hop to the main thread before writing Compose state.
-                executor.execute { if (lensesEnabled) faceState = face }
-            })
+            if (wantsAnalysis) attachAnalyzer(analysis)
 
             val useCases = mutableListOf<UseCase>(previewUseCase)
             when (mode) {
                 CaptureMode.PHOTO -> useCases += ic
                 CaptureMode.VIDEO -> useCases += vc
             }
-            if (wantsAnalysis) useCases += analysis
+            // Analysis is bound even when no lens is active. It is cheap, and it means
+            // switching a lens on or off only attaches or detaches the analyzer instead
+            // of rebinding the camera — a rebind restarts the preview and flickers.
+            useCases += analysis
 
             lensesSupported = true
             camera = try {
                 p.bindToLifecycle(owner, selector, *useCases.toTypedArray())
             } catch (t: Throwable) {
-                if (wantsAnalysis) {
-                    // Some devices cap concurrent use cases; retry without analysis.
-                    analysis.clearAnalyzer()
-                    lensesSupported = false
-                    val reduced = useCases.filter { it !== analysis }.toTypedArray()
-                    p.bindToLifecycle(owner, selector, *reduced)
-                } else {
-                    errorMessage = t.message ?: "Camera failed to bind"
-                    return
-                }
+                // Some devices cap concurrent use cases; retry without analysis.
+                analysis.clearAnalyzer()
+                lensesSupported = false
+                val reduced = useCases.filter { it !== analysis }.toTypedArray()
+                p.bindToLifecycle(owner, selector, *reduced)
             }
 
             imageCapture = ic
@@ -250,8 +256,17 @@ class CameraController(private val context: Context) {
         lens = newLens
         lensesEnabled = newLens.art.isNotEmpty()
         if (!lensesEnabled) faceState = null
-        // Analysis is only bound when a lens is active, so rebind on that edge.
-        if (wasActive != lensesEnabled) rebind()
+        if (wasActive == lensesEnabled) return
+
+        // Attach or detach the analyzer rather than rebinding: analysis is already bound,
+        // and a rebind would restart the preview for no reason.
+        val analysis = imageAnalysis
+        if (analysis != null && lensesSupported) {
+            if (lensesEnabled) attachAnalyzer(analysis) else analysis.clearAnalyzer()
+        } else {
+            // Analysis isn't bound on this device — a rebind is the only way to try.
+            rebind()
+        }
     }
 
     fun applyExtension(ext: CamaraExtension) {

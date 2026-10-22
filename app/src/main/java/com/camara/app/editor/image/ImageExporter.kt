@@ -10,6 +10,7 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import com.camara.app.core.ReleasingChain
 import com.camara.app.filters.ColorMatrixMath
 import com.camara.app.stickers.PlacedSticker
 import com.camara.app.util.BitmapUtils
@@ -29,12 +30,14 @@ object ImageExporter {
 
     /** Rotation, flips and crop. */
     fun renderGeometry(source: Bitmap, edit: ImageEditState): Bitmap {
-        var bmp = source
-        if (edit.rotationDeg != 0f) bmp = BitmapUtils.rotate(bmp, edit.rotationDeg)
-        if (edit.flipH) bmp = BitmapUtils.flip(bmp, true)
-        if (edit.flipV) bmp = BitmapUtils.flip(bmp, false)
-        if (edit.crop != CropRect.FULL) bmp = cropTo(bmp, edit.crop)
-        return bmp
+        // Rotate, flip and crop each allocate. Release each intermediate as the next one
+        // arrives, but never the caller's `source`. See [ReleasingChain].
+        val chain = ReleasingChain(source) { it.recycle() }
+        if (edit.rotationDeg != 0f) chain.advance(BitmapUtils.rotate(chain.value, edit.rotationDeg))
+        if (edit.flipH) chain.advance(BitmapUtils.flip(chain.value, true))
+        if (edit.flipV) chain.advance(BitmapUtils.flip(chain.value, false))
+        if (edit.crop != CropRect.FULL) chain.advance(cropTo(chain.value, edit.crop))
+        return chain.value
     }
 
     // ------------------------------------------------------------- stage 2
