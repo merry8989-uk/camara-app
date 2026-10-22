@@ -59,10 +59,13 @@ class EditHistoryTest {
         f.recordSeparately("a")
         f.recordSeparately("b")
 
+        // Two steps back, so there are two to walk forward again.
         assertEquals("b", f.history.undo("c"))
+        assertEquals("a", f.history.undo("b"))
         assertTrue(f.history.canRedo)
-        assertEquals("c", f.history.redo("b"))
+
         assertEquals("b", f.history.redo("a"))
+        assertEquals("c", f.history.redo("b"))
         assertFalse(f.history.canRedo)
     }
 
