@@ -8,10 +8,18 @@ object Permissions {
 
     val CAMERA = arrayOf(Manifest.permission.CAMERA)
 
-    val CAMERA_AND_MIC = arrayOf(
-        Manifest.permission.CAMERA,
-        Manifest.permission.RECORD_AUDIO
-    )
+    /**
+     * Requested when entering the camera. On API < 29 the shared media store can only be
+     * written with WRITE_EXTERNAL_STORAGE — captures *and* saved edits both go through
+     * MediaStore, so without it they fail silently on Android 7–9.
+     */
+    val CAMERA_AND_MIC: Array<String> = buildList {
+        add(Manifest.permission.CAMERA)
+        add(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }.toTypedArray()
 
     /** Permission set required to read the gallery, which changed in API 33. */
     fun mediaRead(): Array<String> =

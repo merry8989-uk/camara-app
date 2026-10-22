@@ -32,8 +32,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.4.0"
+        versionCode = 8
+        versionName = "1.4.1"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -147,6 +147,9 @@ dependencies {
     // ~200 KB. The model downloads on first use (or at install time, see the manifest).
     implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+    // Explicit, so we can report *why* a face feature is unavailable (unbundled models
+    // can only be fetched by Play Services).
+    implementation("com.google.android.gms:play-services-base:18.5.0")
 
     // EXIF orientation handling
     implementation("androidx.exifinterface:exifinterface:1.3.7")

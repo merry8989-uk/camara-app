@@ -43,6 +43,19 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      # Unit tests cover the colour-matrix engine (the core of every filter, the strength
+      # slider and the beauty grade) and the filter catalogue's integrity.
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace --no-daemon
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+
       # The signing keystore is NOT in the repository. It is stored as a base64
       # repository secret and decoded here, so the key stays private while every
       # build still carries the same certificate (so updates install in place).

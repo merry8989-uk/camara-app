@@ -2,8 +2,10 @@ package com.camara.app.camera
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -49,6 +51,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -72,6 +75,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.camara.app.content.ContentSyncDialog
+import com.camara.app.core.ModelSupport
 import com.camara.app.core.PhotoProcessor
 import com.camara.app.editor.image.ImageEditState
 import com.camara.app.lenses.LensOverlay
@@ -159,6 +163,10 @@ private fun CameraContent(
     var countdown by remember { mutableIntStateOf(0) }
     var showTeleprompter by remember { mutableStateOf(false) }
     var showContent by remember { mutableStateOf(false) }
+    // Why a face feature may not work: the ML models are unbundled and need Play Services.
+    val modelMessage = remember {
+        ModelSupport.message(ModelSupport.status(context))
+    }
 
     DisposableEffect(Unit) {
         controller.attach(lifecycleOwner, previewView)
@@ -407,7 +415,8 @@ private fun CameraContent(
                 )
                 CameraPanel.PORTRAIT -> PortraitPanel(
                     settings = controller.portrait,
-                    onChange = { controller.applyPortrait(it) }
+                    onChange = { controller.applyPortrait(it) },
+                    unavailableMessage = modelMessage
                 )
                 CameraPanel.LENSES -> Column {
                     LensPicker(
@@ -415,7 +424,16 @@ private fun CameraContent(
                         onSelect = { controller.applyLens(it) },
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
-                    if (!controller.lensesSupported) {
+                    if (modelMessage != null) {
+                        // The unbundled models can't arrive without Play Services — say so
+                        // rather than letting the feature look broken.
+                        Text(
+                            modelMessage,
+                            color = Color(0xFFFFB74D),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    } else if (!controller.lensesSupported) {
                         Text(
                             "Face lenses aren't supported alongside all camera modes on this device.",
                             color = Color.White.copy(alpha = 0.7f),
@@ -533,7 +551,8 @@ private fun CameraContent(
 @Composable
 private fun PortraitPanel(
     settings: PortraitSettings,
-    onChange: (PortraitSettings) -> Unit
+    onChange: (PortraitSettings) -> Unit,
+    unavailableMessage: String? = null
 ) {
     Column(
         modifier = Modifier
@@ -576,12 +595,12 @@ private fun PortraitPanel(
             )
         }
         Text(
-            if (settings.subjectPoint == null) {
+            unavailableMessage ?: if (settings.subjectPoint == null) {
                 "Tap the preview to pick what stays sharp. Depth is baked into the photo."
             } else {
                 "Subject picked — tap elsewhere to change it. Depth is baked into the photo."
             },
-            color = Color.White.copy(alpha = 0.45f),
+            color = if (unavailableMessage != null) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.45f),
             fontSize = 10.sp
         )
         Spacer(Modifier.height(8.dp))
@@ -613,6 +632,7 @@ private fun ShutterButton(
 
 @Composable
 private fun PermissionRationale(onGrant: () -> Unit) {
+    val context = LocalContext.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -639,8 +659,23 @@ private fun PermissionRationale(onGrant: () -> Unit) {
             Button(onClick = onGrant) {
                 Text("Grant permission")
             }
+            Spacer(Modifier.height(10.dp))
+            // If the user has denied twice, Android stops showing the system dialog and
+            // re-requesting does nothing — so give them a way through to the app settings
+            // screen instead of leaving them stranded here.
+            TextButton(onClick = { openAppSettings(context) }) {
+                Text("Open app settings", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+            }
         }
     }
+}
+
+private fun openAppSettings(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", context.packageName, null)
+    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
 }
 
 private fun hasCameraPermission(context: Context): Boolean =

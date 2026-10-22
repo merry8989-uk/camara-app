@@ -52,7 +52,10 @@ fun FilterStrip(
     intensity: Float = 1f,
     onIntensityChange: ((Float) -> Unit)? = null
 ) {
-    var category by remember(selected) { mutableStateOf(selected.category) }
+    // Initialised from the current selection but NOT keyed on it: keying on `selected`
+    // re-ran the initialiser whenever a filter was picked, so the carousel jumped back to
+    // another category while the user was browsing. The tab is user-controlled after that.
+    var category by remember { mutableStateOf(selected.category) }
     // Read through ContentStore so remotely-synced filters appear here too.
     val filters = ContentStore.filtersIn(category)
 

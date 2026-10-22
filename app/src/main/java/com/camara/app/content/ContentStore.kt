@@ -103,32 +103,49 @@ object ContentStore {
         }
     }
 
-    /** Fetches the catalogue, caches it, and merges. Falls back to the cache. */
-    suspend fun sync(context: Context): Boolean = withContext(Dispatchers.IO) {
-        status = SyncStatus.SYNCING
-        message = null
-        try {
-            val text = httpGet(sourceUrl)
-            val parsed = CatalogParser.parse(text)
-            remote = parsed
-            File(context.filesDir, CACHE_FILE).writeText(text)
+    /**
+     * Fetches the catalogue, caches it, and merges. Falls back to the cache.
+     *
+     * Compose snapshot state is only ever written on the main thread — writing it from
+     * a background dispatcher is not safe. The network and disk work is dispatched off
+     * the main thread and the results are published back on it.
+     */
+    suspend fun sync(context: Context): Boolean {
+        withContext(Dispatchers.Main.immediate) {
+            status = SyncStatus.SYNCING
+            message = null
+        }
+        return try {
+            val url = sourceUrl
+            val text = withContext(Dispatchers.IO) { httpGet(url) }
+            val parsed = withContext(Dispatchers.Default) { CatalogParser.parse(text) }
             val label = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date())
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString("lastSync", label)
-                .putString("url", sourceUrl)
-                .apply()
-            lastSyncLabel = label
-            applyCounts()
-            status = SyncStatus.OK
-            message = if (parsed.isEmpty) {
-                "Catalogue fetched but contained no items."
-            } else {
-                "Synced ${parsed.filters.size} filters, ${parsed.stickerPacks.size} sticker packs, ${parsed.lenses.size} lenses."
+
+            withContext(Dispatchers.IO) {
+                File(context.filesDir, CACHE_FILE).writeText(text)
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                    .putString("lastSync", label)
+                    .putString("url", url)
+                    .apply()
+            }
+
+            withContext(Dispatchers.Main.immediate) {
+                remote = parsed
+                lastSyncLabel = label
+                applyCounts()
+                status = SyncStatus.OK
+                message = if (parsed.isEmpty) {
+                    "Catalogue fetched but contained no items."
+                } else {
+                    "Synced ${parsed.filters.size} filters, ${parsed.stickerPacks.size} sticker packs, ${parsed.lenses.size} lenses."
+                }
             }
             true
         } catch (t: Throwable) {
-            status = SyncStatus.FAILED
-            message = "Sync failed (${t.javaClass.simpleName}). Using built-in content."
+            withContext(Dispatchers.Main.immediate) {
+                status = SyncStatus.FAILED
+                message = "Sync failed (${t.javaClass.simpleName}). Using built-in content."
+            }
             false
         }
     }

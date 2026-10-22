@@ -86,6 +86,7 @@ import com.camara.app.util.BitmapUtils
 import com.camara.app.util.MediaStoreUtils
 import com.camara.app.util.ShareUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -152,13 +153,34 @@ fun ImageEditorScreen(
 
     // Portrait depth gets a real preview here (unlike the camera, we can afford to
     // segment a single still image).
+    //
+    // Segmentation costs ~200 ms, so it is split from the blur and debounced: the mask is
+    // recomputed only when the subject or the geometry changes, while dragging the blur
+    // slider just re-runs the (cheap) blur. Previously the whole pipeline re-ran on every
+    // slider tick, which made the panel unusable.
+    var portraitMask by remember { mutableStateOf<Bitmap?>(null) }
     var portraitPreview by remember { mutableStateOf<Bitmap?>(null) }
+
     LaunchedEffect(
-        edit.portrait, previewSource, edit.rotationDeg, edit.flipH, edit.flipV, edit.crop
+        edit.portrait.enabled, edit.portrait.subjectPoint,
+        previewSource, edit.rotationDeg, edit.flipH, edit.flipV, edit.crop
+    ) {
+        if (!edit.portrait.enabled) {
+            portraitMask = null
+            return@LaunchedEffect
+        }
+        delay(220) // let taps and drags settle before running inference
+        val src = previewBitmap ?: return@LaunchedEffect
+        portraitMask = SubjectSegmenter.subjectMask(context, src, edit.portrait.subjectPoint)
+    }
+
+    LaunchedEffect(
+        portraitMask, edit.portrait.enabled, edit.portrait.strength,
+        previewSource, edit.rotationDeg, edit.flipH, edit.flipV, edit.crop
     ) {
         val src = previewBitmap
-        portraitPreview = if (edit.portrait.enabled && src != null) {
-            val mask = SubjectSegmenter.subjectMask(context, src, edit.portrait.subjectPoint)
+        val mask = portraitMask
+        portraitPreview = if (edit.portrait.enabled && src != null && mask != null) {
             PortraitBokeh.apply(src, mask, edit.portrait.strength)
         } else {
             null

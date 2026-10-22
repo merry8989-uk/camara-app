@@ -12,7 +12,14 @@ import java.io.InputStream
 /** Bitmap loading / saving helpers with EXIF orientation handling. */
 object BitmapUtils {
 
-    fun decodeUri(context: Context, uri: Uri, maxDim: Int = 4096): Bitmap? {
+    /**
+     * Decodes [uri], downscaling so the longest edge is at most [maxDim].
+     *
+     * The default is deliberately 2560 rather than something larger: a 4096x3072 ARGB
+     * bitmap is ~50 MB on its own, and the editor holds a preview, a face mask and export
+     * intermediates at the same time, which is enough to OOM a 2 GB device.
+     */
+    fun decodeUri(context: Context, uri: Uri, maxDim: Int = 2560): Bitmap? {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, opts)
