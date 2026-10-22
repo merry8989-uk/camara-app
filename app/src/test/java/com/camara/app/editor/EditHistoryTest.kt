@@ -8,7 +8,11 @@ import org.junit.Test
 
 /**
  * Undo/redo semantics, including the coalescing window that makes a slider drag undo in
- * one step. The clock is driven by the test, so nothing here waits on wall time.
+ * one step.
+ *
+ * Every test drives the clock explicitly. With the real clock, two consecutive `record`
+ * calls land in the same millisecond and coalesce — which is the intended behaviour, but
+ * it makes a test that expects two separate steps flaky. Hence the injected clock.
  */
 class EditHistoryTest {
 
@@ -16,6 +20,16 @@ class EditHistoryTest {
         var now = 1_000L
         fun advance(ms: Long) {
             now += ms
+        }
+    }
+
+    private class Fixture(val clock: Clock = Clock(), limit: Int = 60, coalesceMs: Long = 700L) {
+        val history = EditHistory<String>(limit, coalesceMs, clock::now)
+
+        /** Records a value, then moves the clock past the coalescing window. */
+        fun recordSeparately(value: String) {
+            history.record(value)
+            clock.advance(5_000)
         }
     }
 
@@ -30,38 +44,38 @@ class EditHistoryTest {
 
     @Test
     fun `undo returns the state before the change`() {
-        val h = EditHistory<String>()
-        h.record("a")
-        h.record("b")
+        val f = Fixture()
+        f.recordSeparately("a")
+        f.recordSeparately("b")
 
-        assertEquals("b", h.undo("c"))
-        assertEquals("a", h.undo("b"))
-        assertFalse(h.canUndo)
+        assertEquals("b", f.history.undo("c"))
+        assertEquals("a", f.history.undo("b"))
+        assertFalse(f.history.canUndo)
     }
 
     @Test
     fun `redo walks forward again`() {
-        val h = EditHistory<String>()
-        h.record("a")
-        h.record("b")
+        val f = Fixture()
+        f.recordSeparately("a")
+        f.recordSeparately("b")
 
-        assertEquals("b", h.undo("c"))
-        assertTrue(h.canRedo)
-        assertEquals("c", h.redo("b"))
-        assertEquals("b", h.redo("a"))
-        assertFalse(h.canRedo)
+        assertEquals("b", f.history.undo("c"))
+        assertTrue(f.history.canRedo)
+        assertEquals("c", f.history.redo("b"))
+        assertEquals("b", f.history.redo("a"))
+        assertFalse(f.history.canRedo)
     }
 
     @Test
     fun `a new change after an undo drops the redo branch`() {
-        val h = EditHistory<String>()
-        h.record("a")
-        h.record("b")
-        h.undo("c")
-        assertTrue(h.canRedo)
+        val f = Fixture()
+        f.recordSeparately("a")
+        f.recordSeparately("b")
+        f.history.undo("c")
+        assertTrue(f.history.canRedo)
 
-        h.record("b2")
-        assertFalse("redo must be cleared by a new edit", h.canRedo)
+        f.history.record("b2")
+        assertFalse("redo must be cleared by a new edit", f.history.canRedo)
     }
 
     @Test
@@ -69,15 +83,15 @@ class EditHistoryTest {
         val clock = Clock()
         val h = EditHistory<String>(coalesceMs = 700L, clock = clock::now)
 
-        h.record("start")      // first entry
+        h.record("start")     // first entry
         clock.advance(50)
-        h.record("mid-1")      // same drag: coalesced, not pushed
+        h.record("mid-1")     // same drag: coalesced, not pushed
         clock.advance(50)
-        h.record("mid-2")      // coalesced
+        h.record("mid-2")     // coalesced
         clock.advance(50)
-        h.record("mid-3")      // coalesced
+        h.record("mid-3")     // coalesced
 
-        // One undo should land on the state before the whole drag.
+        // One undo lands on the state before the whole drag.
         assertEquals("start", h.undo("end"))
         assertFalse("the drag must undo in one step", h.canUndo)
     }
@@ -101,8 +115,7 @@ class EditHistoryTest {
 
     @Test
     fun `the very first record is always pushed`() {
-        val clock = Clock()
-        val h = EditHistory<String>(coalesceMs = 700L, clock = clock::now)
+        val h = EditHistory<String>(coalesceMs = 700L, clock = Clock().let { c -> { c.now } })
         h.record("only")
         assertTrue(h.canUndo)
         assertEquals("only", h.undo("now"))
@@ -110,32 +123,27 @@ class EditHistoryTest {
 
     @Test
     fun `history is capped at the limit`() {
-        val clock = Clock()
-        val h = EditHistory<String>(limit = 3, coalesceMs = 0L, clock = clock::now)
-
-        listOf("a", "b", "c", "d", "e").forEach {
-            h.record(it)
-            clock.advance(10)
-        }
+        val f = Fixture(limit = 3)
+        listOf("a", "b", "c", "d", "e").forEach { f.recordSeparately(it) }
 
         // The last three records survive: e, d, c.
-        assertEquals("e", h.undo("f"))
-        assertEquals("d", h.undo("e"))
-        assertEquals("c", h.undo("d"))
-        assertFalse(h.canUndo)
+        assertEquals("e", f.history.undo("f"))
+        assertEquals("d", f.history.undo("e"))
+        assertEquals("c", f.history.undo("d"))
+        assertFalse(f.history.canUndo)
     }
 
     @Test
     fun `clear forgets everything`() {
-        val h = EditHistory<String>()
-        h.record("a")
-        h.record("b")
-        h.undo("c")
+        val f = Fixture()
+        f.recordSeparately("a")
+        f.recordSeparately("b")
+        f.history.undo("c")
 
-        h.clear()
+        f.history.clear()
 
-        assertFalse(h.canUndo)
-        assertFalse(h.canRedo)
-        assertNull(h.undo("c"))
+        assertFalse(f.history.canUndo)
+        assertFalse(f.history.canRedo)
+        assertNull(f.history.undo("c"))
     }
 }
