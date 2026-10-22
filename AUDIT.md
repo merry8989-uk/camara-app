@@ -64,6 +64,7 @@ silently producing an unsigned APK.
 | 13 | `editor/` | No undo/redo | Feature gap — the single most-requested editing affordance. **fixed** (v1.4.2) |
 | 14 | `camera/` | Live look isn't applied to the **recorded** video stream | Feature gap (needs a GL pipeline, not `RenderEffect`). |
 | 15 | `editor/video/` | No undo/redo, and no trim handles beyond the range slider | Feature gap. |
+| 16 | `ui/components/FilterStrip.kt` | Filter chips were a colour gradient derived from the matrix, which says almost nothing about what the filter does | You had to try every filter to see it. **fixed** (v1.5.2: chips render the filter on a real photo) |
 
 ---
 
@@ -76,6 +77,7 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 3 (quality):** unit tests for the colour-matrix engine + a CI step that runs them. ✅ v1.4.1
 - **Step 4 (P2):** faster separable blur (+ tests) and undo/redo in the image editor. ✅ v1.4.2
 - **Step 5 (P2):** bitmap recycling in the editor; reduce camera rebind flicker. ✅ v1.5.1
+- **Step 5b (UX):** filter chips render the actual filter on a real photo. ✅ v1.5.2
 - **Step 6 (P2):** undo/redo in the video editor.
 - **Step 7 (feature):** video text/sticker overlays and transitions.
 - **Step 8 (feature):** apply the live look to the recorded video stream (GL pipeline).

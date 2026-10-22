@@ -390,7 +390,10 @@ fun ImageEditorScreen(
                         selected = edit.filter,
                         onSelect = { edit = edit.copy(filter = it) },
                         intensity = edit.filterIntensity,
-                        onIntensityChange = { edit = edit.copy(filterIntensity = it) }
+                        onIntensityChange = { edit = edit.copy(filterIntensity = it) },
+                        // Render the chips on the photo being edited, so the preview is
+                        // of this picture rather than a stock sample.
+                        thumbnailSource = previewSource
                     )
                 }
                 EditorTool.PORTRAIT -> PortraitEditorPanel(

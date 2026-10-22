@@ -1,5 +1,7 @@
 package com.camara.app.ui.components
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,13 +42,20 @@ import com.camara.app.content.ContentStore
 import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterCategory
 import com.camara.app.filters.FilterSwatch
+import com.camara.app.filters.FilterThumbnails
 import com.camara.app.ui.theme.Accent
 import kotlin.math.roundToInt
 
 /**
- * The filter browser: a category row, a carousel of filters with live colour
- * swatches, and (when [onIntensityChange] is supplied) a strength slider that
- * blends the look toward the original.
+ * The filter browser: a category row, a carousel of filters rendered on a real photo, and
+ * (when [onIntensityChange] is supplied) a strength slider that blends the look toward the
+ * original.
+ *
+ * Each chip shows the filter **applied to a photograph**, not a colour gradient, so you
+ * can tell what a filter does without trying it. [thumbnailSource] is the photo to render
+ * from — the editor passes the image being edited; the camera passes nothing and gets the
+ * bundled sample, because the live preview is often a blank wall where every filter looks
+ * the same.
  */
 @Composable
 fun FilterStrip(
@@ -50,8 +63,10 @@ fun FilterStrip(
     onSelect: (Filter) -> Unit,
     modifier: Modifier = Modifier,
     intensity: Float = 1f,
-    onIntensityChange: ((Float) -> Unit)? = null
+    onIntensityChange: ((Float) -> Unit)? = null,
+    thumbnailSource: Bitmap? = null
 ) {
+    val context = LocalContext.current
     // Initialised from the current selection but NOT keyed on it: keying on `selected`
     // re-ran the initialiser whenever a filter was picked, so the carousel jumped back to
     // another category while the user was browsing. The tab is user-controlled after that.
@@ -89,6 +104,9 @@ fun FilterStrip(
             items(filters, key = { it.id }) { filter ->
                 val isSelected = filter.id == selected.id
                 val swatch = FilterSwatch.color(filter)
+                val thumb = remember(filter.id, thumbnailSource) {
+                    FilterThumbnails.thumbnail(context, filter, thumbnailSource)
+                }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -99,6 +117,8 @@ fun FilterStrip(
                         modifier = Modifier
                             .size(54.dp)
                             .clip(CircleShape)
+                            // The gradient is only a placeholder for the frame before a
+                            // photo is ready; the real thumbnail covers it.
                             .background(
                                 Brush.linearGradient(
                                     listOf(swatch, swatch.copy(alpha = 0.55f), Color(0xFF101014))
@@ -109,7 +129,16 @@ fun FilterStrip(
                                 color = if (isSelected) Accent else Color.White.copy(alpha = 0.25f),
                                 shape = CircleShape
                             )
-                    )
+                    ) {
+                        if (thumb != null) {
+                            Image(
+                                bitmap = thumb.asImageBitmap(),
+                                contentDescription = "${filter.name} preview",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
                     Text(
                         text = filter.name,
                         color = if (isSelected) Accent else Color.White.copy(alpha = 0.8f),
