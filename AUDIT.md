@@ -30,13 +30,14 @@ Status key: **fixed** · **in progress** · **planned**
 
 | # | Where | Problem | Impact |
 | --- | --- | --- | --- |
-| 8 | `util/Blur.kt` | `boxBlur` is O(w·h·r²) — a 1024² image at radius 4 is ~84 M operations | Beauty smoothing and bokeh are slow; visible lag on export. |
+| 8 | `util/Blur.kt` | `boxBlur` was O(w·h·r²) — a 1024² image at radius 4 was ~84 M operations | Beauty smoothing and bokeh were slow. **fixed** (separable blur, O(w·h) per pass, with tests) |
 | 9 | `editor/` | Preview bitmaps are recomputed and dropped without recycling | GC churn; contributes to OOM risk on big images. |
 | 10 | whole app | **No unit tests at all** | The colour-matrix maths — the core of every filter — has never been verified by a test. **fixed** (JVM tests added) |
 | 11 | `camera/CameraController.kt` | `rebind()` runs on every mode switch and lens toggle | Visible preview flicker. |
 | 12 | `editor/video/` | No text/sticker overlays, transitions or reverse | Feature gap. |
-| 13 | `editor/` | No undo/redo | Feature gap — the single most-requested editing affordance. |
+| 13 | `editor/` | No undo/redo | Feature gap — the single most-requested editing affordance. **fixed** (v1.4.2) |
 | 14 | `camera/` | Live look isn't applied to the **recorded** video stream | Feature gap (needs a GL pipeline, not `RenderEffect`). |
+| 15 | `editor/video/` | No undo/redo, and no trim handles beyond the range slider | Feature gap. |
 
 ---
 
@@ -44,9 +45,13 @@ Status key: **fixed** · **in progress** · **planned**
 
 Worked in priority order, one commit per group, each verified by a CI build.
 
-- **Step 1 (P0):** fix the four real bugs — main-thread state writes, segmentation debounce/split, legacy write permission, permission recovery.
-- **Step 2 (P1):** ML Kit availability messaging, filter-strip state, image size cap.
-- **Step 3 (quality):** unit tests for the colour-matrix engine + a CI step that runs them.
-- **Step 4 (P2, later):** faster blur, bitmap recycling, undo/redo, video overlays, recorded-video effects.
+- **Step 1 (P0):** fix the four real bugs — main-thread state writes, segmentation debounce/split, legacy write permission, permission recovery. ✅ v1.4.1
+- **Step 2 (P1):** ML Kit availability messaging, filter-strip state, image size cap. ✅ v1.4.1
+- **Step 3 (quality):** unit tests for the colour-matrix engine + a CI step that runs them. ✅ v1.4.1
+- **Step 4 (P2):** faster separable blur (+ tests) and undo/redo in the image editor. ✅ v1.4.2
+- **Step 5 (P2):** bitmap recycling in the editor; reduce camera rebind flicker.
+- **Step 6 (P2):** undo/redo in the video editor.
+- **Step 7 (feature):** video text/sticker overlays and transitions.
+- **Step 8 (feature):** apply the live look to the recorded video stream (GL pipeline).
 
 Each step ends with a signed release so the fixes are installable.

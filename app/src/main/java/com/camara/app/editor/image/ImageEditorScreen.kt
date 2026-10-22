@@ -37,11 +37,12 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.FilterFrames
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Portrait
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -103,6 +104,31 @@ fun ImageEditorScreen(
     var base by remember { mutableStateOf<Bitmap?>(null) }
     var previewSource by remember { mutableStateOf<Bitmap?>(null) }
     var edit by remember { mutableStateOf(ImageEditState()) }
+
+    // Undo/redo. `historyBaseline` always holds the state from *before* the latest change,
+    // and undo/redo write it in the same event as `edit` — so the effect below sees them
+    // equal and doesn't record the undo itself as a fresh edit.
+    val history = remember { EditHistory() }
+    var historyBaseline by remember { mutableStateOf(ImageEditState()) }
+
+    LaunchedEffect(edit) {
+        if (edit != historyBaseline) {
+            history.record(historyBaseline)
+            historyBaseline = edit
+        }
+    }
+
+    fun undoEdit() {
+        val target = history.undo(edit) ?: return
+        historyBaseline = target
+        edit = target
+    }
+
+    fun redoEdit() {
+        val target = history.redo(edit) ?: return
+        historyBaseline = target
+        edit = target
+    }
     var tool by remember { mutableStateOf(EditorTool.NONE) }
     var textDialog by remember { mutableStateOf(false) }
     var drawColor by remember { mutableIntStateOf(0xFFFF2D78.toInt()) }
@@ -233,8 +259,19 @@ fun ImageEditorScreen(
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { edit = ImageEditState() }) {
-                Icon(Icons.Filled.Refresh, contentDescription = "Reset", tint = Color.White.copy(alpha = 0.7f))
+            IconButton(onClick = { undoEdit() }, enabled = history.canUndo) {
+                Icon(
+                    Icons.Filled.Undo,
+                    contentDescription = "Undo",
+                    tint = if (history.canUndo) Color.White else Color.White.copy(alpha = 0.28f)
+                )
+            }
+            IconButton(onClick = { redoEdit() }, enabled = history.canRedo) {
+                Icon(
+                    Icons.Filled.Redo,
+                    contentDescription = "Redo",
+                    tint = if (history.canRedo) Color.White else Color.White.copy(alpha = 0.28f)
+                )
             }
             IconButton(onClick = { share() }, enabled = !saving && base != null) {
                 Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White)
@@ -668,6 +705,60 @@ private fun PortraitEditorPanel(
             color = Color.White.copy(alpha = 0.45f),
             fontSize = 10.sp
         )
+    }
+}
+
+/**
+ * Undo/redo stack for the editor.
+ *
+ * Rapid changes are coalesced: a new entry is only pushed when more than [COALESCE_MS]
+ * has passed since the last one, so dragging a slider undoes in a single step instead of
+ * filling the stack with one entry per frame. `canUndo`/`canRedo` are Compose state, so
+ * the toolbar buttons enable and disable themselves.
+ */
+private class EditHistory {
+    private val past = ArrayDeque<ImageEditState>()
+    private val future = ArrayDeque<ImageEditState>()
+    private var lastRecordedAt = 0L
+
+    var canUndo by mutableStateOf(false); private set
+    var canRedo by mutableStateOf(false); private set
+
+    fun record(previous: ImageEditState) {
+        val now = System.currentTimeMillis()
+        if (now - lastRecordedAt > COALESCE_MS) {
+            past.addLast(previous)
+            while (past.size > MAX_ENTRIES) past.removeFirst()
+        }
+        future.clear()
+        lastRecordedAt = now
+        sync()
+    }
+
+    fun undo(current: ImageEditState): ImageEditState? {
+        val previous = past.removeLastOrNull() ?: return null
+        future.addLast(current)
+        lastRecordedAt = 0L
+        sync()
+        return previous
+    }
+
+    fun redo(current: ImageEditState): ImageEditState? {
+        val next = future.removeLastOrNull() ?: return null
+        past.addLast(current)
+        lastRecordedAt = 0L
+        sync()
+        return next
+    }
+
+    private fun sync() {
+        canUndo = past.isNotEmpty()
+        canRedo = future.isNotEmpty()
+    }
+
+    private companion object {
+        const val COALESCE_MS = 700L
+        const val MAX_ENTRIES = 60
     }
 }
 
