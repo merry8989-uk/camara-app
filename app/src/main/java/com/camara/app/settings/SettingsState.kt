@@ -16,7 +16,7 @@ data class SettingsState(
     val gridByDefault: Boolean = false,
     val timerSeconds: Int = 0,
     /** Per-feature on/off switches, persisted individually. */
-    val featureFlags: Map<String, Boolean> = FeatureFlags.defaults(),
+    val featureFlags: Map<String, Boolean> = FeatureFlag.defaults(),
 ) {
     fun isEnabled(flag: FeatureFlag): Boolean = featureFlags[flag.id] ?: flag.defaultOn
 }

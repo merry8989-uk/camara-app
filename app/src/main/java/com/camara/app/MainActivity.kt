@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
                     DiagnosticsLogger.setEnabled(settings.diagnosticsEnabled)
                 }
                 LaunchedEffect(settings.immersiveMode) {
-                    setImmersive(settings.immersiveMode)
+                    applyImmersiveMode(settings.immersiveMode)
                 }
 
                 CamaraTheme(darkTheme = dark, accent = Color(settings.accentColor)) {
@@ -61,8 +61,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Hides or restores the system bars (Rule 4: full-screen by default). */
-    private fun setImmersive(enabled: Boolean) {
+    /**
+     * Hides or restores the system bars (Rule 4: full-screen by default).
+     *
+     * Named "apply…" rather than "set…" because Activity already has a hidden
+     * `setImmersive` member, which a plain override would clash with.
+     */
+    private fun applyImmersiveMode(enabled: Boolean) {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         if (enabled) {
             controller.hide(WindowInsetsCompat.Type.systemBars())
