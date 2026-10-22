@@ -1,6 +1,7 @@
 package com.camara.app.video
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Letterbox maths for overlay positioning. */
@@ -51,13 +52,19 @@ class FrameFitTest {
     }
 
     @Test
-    fun `the fitted rect never escapes the box`() {
-        listOf(1080f to 1920f, 1920f to 1080f, 4000f to 1000f).forEach { (vw, vh) ->
+    fun `the fitted rect stays inside the box and fills one dimension`() {
+        listOf(1080f to 1920f, 1920f to 1080f, 4000f to 1000f, 1080f to 1080f).forEach { (vw, vh) ->
             val r = FrameFit.rect(360f, 640f, vw, vh)
-            assertEquals("left", 0f, r[0], 0.01f)
-            assertEquals("top", 0f, r[1], 0.01f)
-            assertEquals("right", 360f, r[2], 0.01f)
-            assertEquals("bottom", 640f, r[3], 0.01f)
+            assertTrue("$vw x $vh: left inside", r[0] >= -0.01f)
+            assertTrue("$vw x $vh: top inside", r[1] >= -0.01f)
+            assertTrue("$vw x $vh: right inside", r[2] <= 360.01f)
+            assertTrue("$vw x $vh: bottom inside", r[3] <= 640.01f)
+
+            // A wider video is letterboxed (full width, bars top and bottom) and a taller
+            // one is pillarboxed — either way exactly one dimension is filled.
+            val fillsWidth = r[0] <= 0.01f && r[2] >= 359.99f
+            val fillsHeight = r[1] <= 0.01f && r[3] >= 639.99f
+            assertTrue("$vw x $vh must fill one dimension", fillsWidth || fillsHeight)
         }
     }
 
