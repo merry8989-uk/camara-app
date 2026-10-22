@@ -127,6 +127,12 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           ls -l dist
 
+          # Name the asset after the release. CI builds app-release.apk; every hand-made
+          # release has shipped camara-<version>.apk, and the in-app updater picks the
+          # first .apk asset, so the name only matters for people downloading by hand.
+          mv dist/app-release.apk "dist/camara-${TAG}.apk"
+          ls -l dist
+
           # A release may already exist: created as a draft so the notes can be written by
           # hand. In that case attach the APK and publish it, rather than leaving the
           # draft without an asset.
