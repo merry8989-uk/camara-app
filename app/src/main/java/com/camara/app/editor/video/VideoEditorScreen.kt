@@ -20,8 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -59,6 +61,7 @@ import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.ui.PlayerView
+import com.camara.app.editor.EditHistory
 import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterPresets
 import com.camara.app.ui.components.FilterStrip
@@ -95,6 +98,37 @@ fun VideoEditorScreen(
     var progress by remember { mutableFloatStateOf(0f) }
     var transformerRef by remember { mutableStateOf<Transformer?>(null) }
 
+    // Undo/redo over the trim range, filter and speed. `historyBaseline` holds the state
+    // from *before* the latest change, and undo/redo write it in the same event as the
+    // values themselves — so the effect below sees them equal and doesn't record the undo
+    // as a fresh edit.
+    val history = remember { EditHistory<VideoEdit>() }
+    var historyBaseline by remember { mutableStateOf(VideoEdit(0f..0f, FilterPresets.NONE, 1f)) }
+    val currentEdit = VideoEdit(range, filter, speed)
+
+    LaunchedEffect(currentEdit) {
+        if (currentEdit != historyBaseline) {
+            history.record(historyBaseline)
+            historyBaseline = currentEdit
+        }
+    }
+
+    fun undoEdit() {
+        val target = history.undo(currentEdit) ?: return
+        historyBaseline = target
+        range = target.range
+        filter = target.filter
+        speed = target.speed
+    }
+
+    fun redoEdit() {
+        val target = history.redo(currentEdit) ?: return
+        historyBaseline = target
+        range = target.range
+        filter = target.filter
+        speed = target.speed
+    }
+
     LaunchedEffect(sourceUri) {
         if (sourceUri == null) return@LaunchedEffect
         val dur = withContext(Dispatchers.IO) {
@@ -110,6 +144,10 @@ fun VideoEditorScreen(
         }
         durationMs = dur.toFloat()
         range = 0f..dur.toFloat()
+        // The loaded state is the starting point, not an edit: undo should never take the
+        // trim range back to zero.
+        historyBaseline = VideoEdit(range, filter, speed)
+        history.clear()
         exo.setMediaItem(MediaItem.fromUri(sourceUri))
         exo.prepare()
     }
@@ -226,6 +264,20 @@ fun VideoEditorScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = { undoEdit() }, enabled = history.canUndo) {
+                Icon(
+                    Icons.Filled.Undo,
+                    contentDescription = "Undo",
+                    tint = if (history.canUndo) Color.White else Color.White.copy(alpha = 0.28f)
+                )
+            }
+            IconButton(onClick = { redoEdit() }, enabled = history.canRedo) {
+                Icon(
+                    Icons.Filled.Redo,
+                    contentDescription = "Redo",
+                    tint = if (history.canRedo) Color.White else Color.White.copy(alpha = 0.28f)
+                )
+            }
             IconButton(onClick = { export(shareAfter = true) }, enabled = !exporting && sourceUri != null) {
                 Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White)
             }
@@ -339,6 +391,13 @@ fun VideoEditorScreen(
         }
     }
 }
+
+/** Everything the video editor lets you change. */
+private data class VideoEdit(
+    val range: ClosedFloatingPointRange<Float>,
+    val filter: Filter,
+    val speed: Float,
+)
 
 private fun fmt(ms: Float): String {
     val totalSeconds = (ms / 1000f).toInt().coerceAtLeast(0)

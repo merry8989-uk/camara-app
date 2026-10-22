@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import com.camara.app.core.PhotoProcessor
+import com.camara.app.editor.EditHistory
 import com.camara.app.filters.ColorMatrixMath
 import com.camara.app.portrait.PortraitBokeh
 import com.camara.app.portrait.PortraitSettings
@@ -108,7 +109,7 @@ fun ImageEditorScreen(
     // Undo/redo. `historyBaseline` always holds the state from *before* the latest change,
     // and undo/redo write it in the same event as `edit` — so the effect below sees them
     // equal and doesn't record the undo itself as a fresh edit.
-    val history = remember { EditHistory() }
+    val history = remember { EditHistory<ImageEditState>() }
     var historyBaseline by remember { mutableStateOf(ImageEditState()) }
 
     LaunchedEffect(edit) {
@@ -708,60 +709,6 @@ private fun PortraitEditorPanel(
             color = Color.White.copy(alpha = 0.45f),
             fontSize = 10.sp
         )
-    }
-}
-
-/**
- * Undo/redo stack for the editor.
- *
- * Rapid changes are coalesced: a new entry is only pushed when more than [COALESCE_MS]
- * has passed since the last one, so dragging a slider undoes in a single step instead of
- * filling the stack with one entry per frame. `canUndo`/`canRedo` are Compose state, so
- * the toolbar buttons enable and disable themselves.
- */
-private class EditHistory {
-    private val past = ArrayDeque<ImageEditState>()
-    private val future = ArrayDeque<ImageEditState>()
-    private var lastRecordedAt = 0L
-
-    var canUndo by mutableStateOf(false); private set
-    var canRedo by mutableStateOf(false); private set
-
-    fun record(previous: ImageEditState) {
-        val now = System.currentTimeMillis()
-        if (now - lastRecordedAt > COALESCE_MS) {
-            past.addLast(previous)
-            while (past.size > MAX_ENTRIES) past.removeFirst()
-        }
-        future.clear()
-        lastRecordedAt = now
-        sync()
-    }
-
-    fun undo(current: ImageEditState): ImageEditState? {
-        val previous = past.removeLastOrNull() ?: return null
-        future.addLast(current)
-        lastRecordedAt = 0L
-        sync()
-        return previous
-    }
-
-    fun redo(current: ImageEditState): ImageEditState? {
-        val next = future.removeLastOrNull() ?: return null
-        past.addLast(current)
-        lastRecordedAt = 0L
-        sync()
-        return next
-    }
-
-    private fun sync() {
-        canUndo = past.isNotEmpty()
-        canRedo = future.isNotEmpty()
-    }
-
-    private companion object {
-        const val COALESCE_MS = 700L
-        const val MAX_ENTRIES = 60
     }
 }
 
