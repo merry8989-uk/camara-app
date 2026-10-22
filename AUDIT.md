@@ -60,7 +60,8 @@ silently producing an unsigned APK.
 | 9 | `editor/`, `core/` | Every pipeline stage allocated a bitmap and dropped the previous one, so an export held six full-size bitmaps at once | OOM risk on a 12 MP photo on a 2 GB device. **fixed** (v1.5.1: ownership-aware [ReleasingChain], unit tested) |
 | 10 | whole app | **No unit tests at all** | The colour-matrix maths — the core of every filter — has never been verified by a test. **fixed** (JVM tests added) |
 | 11 | `camera/CameraController.kt` | `rebind()` ran on every lens toggle (analysis was only bound while a lens was active) | Visible preview flicker each time a lens was turned on or off. **fixed** (v1.5.1: analysis always bound, only the analyzer is attached/detached) |
-| 12 | `editor/video/` | No text/sticker overlays, transitions or reverse | Feature gap. |
+| 12 | `editor/video/` | No text/sticker overlays | **fixed** (v1.5.4: timed text and sticker overlays, baked into the export) |
+| 17 | `editor/video/` | No transitions or reverse, and still single-clip | Feature gap — needs a multi-clip timeline. |
 | 13 | `editor/` | No undo/redo | Feature gap — the single most-requested editing affordance. **fixed** (v1.4.2) |
 | 14 | `camera/` | Live look isn't applied to the **recorded** video stream | Feature gap (needs a GL pipeline, not `RenderEffect`). |
 | 15 | `editor/video/` | No undo/redo; no trim handles beyond the range slider | You could not take back a trim, filter or speed change. **undo/redo fixed** (v1.5.3) |
@@ -79,7 +80,7 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 5 (P2):** bitmap recycling in the editor; reduce camera rebind flicker. ✅ v1.5.1
 - **Step 5b (UX):** filter chips render the actual filter on a real photo. ✅ v1.5.2
 - **Step 6 (P2):** undo/redo in the video editor, on a shared + tested [EditHistory]. ✅ v1.5.3
-- **Step 7 (feature):** video text/sticker overlays and transitions.
+- **Step 7 (feature):** video text/sticker overlays, baked into the export. ✅ v1.5.4 (transitions need a multi-clip timeline — not done)
 - **Step 8 (feature):** apply the live look to the recorded video stream (GL pipeline).
 
 Each step ends with a signed release so the fixes are installable.
