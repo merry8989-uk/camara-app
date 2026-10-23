@@ -1,5 +1,6 @@
 package com.camara.app.filters
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -82,6 +83,16 @@ class UserFilterStoreTest {
         assertFalse(UserFilterStore.isUserFilter(saved.id))
     }
 
+    /** Applies a 4x5 row-major matrix to one RGBA pixel, the way Android does. */
+    private fun apply(m: FloatArray, r: Float, g: Float, b: Float): FloatArray {
+        val v = floatArrayOf(r, g, b, 255f, 1f)
+        return FloatArray(4) { i ->
+            var sum = 0f
+            for (k in 0..4) sum += m[i * 5 + k] * v[k]
+            sum
+        }
+    }
+
     @Test
     fun `the saved matrix is exactly the look on screen`() {
         val base = FilterPresets.ALL.first { it.category == FilterCategory.WARM }
@@ -93,18 +104,30 @@ class UserFilterStoreTest {
             warmth = 0.15f
         )
 
-        // Saving composes the filter at its strength with the adjustments. Applying that
-        // one matrix must equal applying them one after the other, which is what the
-        // preview showed.
+        // Saving stores one matrix: the adjustments, then the filter at its strength.
         val saved = ColorMatrixMath.compose(
             base.matrixAt(intensity),
             adjustments.matrix()
         )
-        val oneAfterTheOther = ColorMatrixMath.compose(
-            adjustments.matrix(),
-            base.matrixAt(intensity)
+
+        // Applying that single matrix must give the same pixel as running the two stages
+        // one after the other — which is what the preview showed. Comparing the composed
+        // matrices would prove nothing: matrix multiplication does not commute, and the
+        // order is the whole point.
+        val pixel = Triple(120f, 90f, 60f)
+        val staged = apply(
+            base.matrixAt(intensity),
+            apply(adjustments.matrix(), pixel.first, pixel.second, pixel.third)[0],
+            apply(adjustments.matrix(), pixel.first, pixel.second, pixel.third)[1],
+            apply(adjustments.matrix(), pixel.first, pixel.second, pixel.third)[2]
         )
-        assertTrue("saved look must match the screen", saved.contentEquals(oneAfterTheOther))
+        assertArrayEquals(
+            "saved look must match the screen",
+            staged,
+            apply(saved, pixel.first, pixel.second, pixel.third),
+            0.01f
+        )
+
         assertFalse(
             "saving must not silently do nothing",
             saved.contentEquals(ColorMatrixMath.IDENTITY)
