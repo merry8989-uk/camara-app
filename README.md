@@ -329,7 +329,8 @@ That single matrix is reused everywhere:
 - [x] Unit tests for the filter maths, blur, undo history and frame fitting
 - [ ] Beauty and AR lenses baked into the recorded video (needs per-frame face tracking)
 - [x] Multi-clip timeline — add, trim, reorder and join clips into one video
-- [ ] Video transitions and reverse
+- [x] Fade-to-black transitions between clips
+- [ ] Crossfade (needs a hand-written GL shader) and reverse
 - [ ] Ship a Play-ready App Bundle
 - [x] Save your own filters (the look on screen, kept in a "Mine" tab)
 - [ ] Direct share targets for specific social apps

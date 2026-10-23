@@ -75,6 +75,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.effect.RgbMatrix
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.EditedMediaItem
@@ -86,6 +87,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.ui.PlayerView
 import com.camara.app.editor.EditHistory
 import com.camara.app.filters.Filter
+import com.camara.app.video.ClipFade
 import com.camara.app.video.FrameFit
 import com.camara.app.video.TimelineClip
 import com.camara.app.video.VideoTimeline
@@ -123,6 +125,7 @@ fun VideoEditorScreen(
     var timeline by remember { mutableStateOf(VideoTimeline()) }
     var selectedClipId by remember { mutableStateOf<Long?>(null) }
     var filter by remember { mutableStateOf<Filter>(FilterPresets.NONE) }
+    var fadeMs by remember { mutableFloatStateOf(0f) }
     val durationMs = timeline.totalDurationMs
     val selectedClip = timeline.clip(selectedClipId ?: -1L)
     var speed by remember { mutableFloatStateOf(1f) }
@@ -154,7 +157,7 @@ fun VideoEditorScreen(
     // as a fresh edit.
     val history = remember { EditHistory<VideoEdit>() }
     var historyBaseline by remember { mutableStateOf(VideoEdit(VideoTimeline(), FilterPresets.NONE, 1f)) }
-    val currentEdit = VideoEdit(timeline, filter, speed, overlays)
+    val currentEdit = VideoEdit(timeline, filter, speed, overlays, fadeMs)
 
     fun restore(target: VideoEdit) {
         historyBaseline = target
@@ -162,6 +165,7 @@ fun VideoEditorScreen(
         filter = target.filter
         speed = target.speed
         overlays = target.overlays
+        fadeMs = target.fadeMs
         // Undo can remove the clip that was selected; fall back to the first one.
         if (timeline.clip(selectedClipId ?: -1L) == null) {
             selectedClipId = timeline.clips.firstOrNull()?.id
@@ -214,7 +218,7 @@ fun VideoEditorScreen(
         timeline = VideoTimeline(listOf(opened))
         selectedClipId = opened.id
         // The loaded state is the starting point, not an edit.
-        historyBaseline = VideoEdit(timeline, filter, speed, overlays)
+        historyBaseline = VideoEdit(timeline, filter, speed, overlays, fadeMs)
         history.clear()
     }
 
@@ -288,6 +292,13 @@ fun VideoEditorScreen(
         val videoEffects = buildList {
             addAll(VideoEffects.forFilter(filter))
             VideoOverlays.overlayEffect(overlays, videoWidth, videoHeight)?.let { add(it) }
+            // Fade to black at the joins, last so everything above darkens together.
+            // RgbMatrix is evaluated per frame with that frame's timestamp, which is
+            // exactly what makes a time-varying fade possible without a custom shader.
+            if (fadeMs > 0f) {
+                val ramp = ClipFade(timeline.spans(), fadeMs)
+                add(RgbMatrix { timeUs, _ -> ramp.matrixAt(timeUs / 1000f) })
+            }
         }
 
         // The filter and the overlays apply to the whole timeline, so they go on the
@@ -658,6 +669,43 @@ fun VideoEditorScreen(
             }
         }
 
+        // Transition
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Transition",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "Fade to black · applied on export",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp
+                )
+            }
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ClipFade.CHOICES.forEach { choice ->
+                    val chosen = kotlin.math.abs(choice - fadeMs) < 0.001f
+                    Text(
+                        text = ClipFade.label(choice),
+                        color = if (chosen) Color.White else Color.White.copy(alpha = 0.65f),
+                        fontSize = 12.sp,
+                        fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (chosen) Accent else Color.White.copy(alpha = 0.08f))
+                            .clickable { fadeMs = choice }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
         // Filters
         if (overlayPanel) {
             VideoOverlayPanel(
@@ -745,6 +793,7 @@ private data class VideoEdit(
     val filter: Filter,
     val speed: Float,
     val overlays: List<VideoOverlay> = emptyList(),
+    val fadeMs: Float = 0f,
 )
 
 /**

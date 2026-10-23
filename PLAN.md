@@ -123,8 +123,9 @@ per run. Different certificate → Android rejects the update → uninstall requ
 1. **Beauty and lenses in recordings** — the filter is baked in now; beauty and AR lenses
    still only appear on the preview, because both need per-frame face tracking. A real-time
    GL pipeline (`CameraEffect`) would do it, but it switches off Camera Extensions.
-2. **Video transitions and reverse** — the multi-clip timeline is in (v1.7.0), so
-transitions now have somewhere to happen; reverse needs frames re-encoded backwards.
+2. **Crossfade and reverse** — fade-to-black is in (v1.9.0). A crossfade needs a
+time-varying *alpha*, which Media3 only exposes through a hand-written GL shader;
+reverse needs frames re-encoded backwards.
 3. **Custom filters** — build a look from the adjust sliders and save it as a preset.
 4. **Play-ready App Bundle** — the keystore is done; `bundleRelease` is not wired yet.
 5. **Direct share targets** — one-tap share to specific apps.

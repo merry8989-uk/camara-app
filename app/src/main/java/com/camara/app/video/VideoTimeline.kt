@@ -94,4 +94,19 @@ data class VideoTimeline(val clips: List<TimelineClip> = emptyList()) {
         }
         return 0f
     }
+
+    /** Where each clip sits on the whole timeline. */
+    fun spans(): List<ClipSpan> {
+        var cursor = 0f
+        return clips.map { clip ->
+            val span = ClipSpan(clip.id, cursor, cursor + clip.durationMs)
+            cursor += clip.durationMs
+            span
+        }
+    }
+}
+
+/** A clip's position on the whole timeline. */
+data class ClipSpan(val id: Long, val startMs: Float, val endMs: Float) {
+    val durationMs: Float get() = (endMs - startMs).coerceAtLeast(0f)
 }
