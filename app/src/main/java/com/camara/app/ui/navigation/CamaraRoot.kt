@@ -11,6 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.camara.app.camera.CameraScreen
 import com.camara.app.content.ContentStore
+import com.camara.app.filters.UserFilterStore
 import com.camara.app.editor.image.ImageEditorScreen
 import com.camara.app.editor.video.VideoEditorScreen
 import com.camara.app.gallery.GalleryScreen
@@ -39,7 +40,11 @@ fun CamaraRoot() {
 
     // Bring in the cached content catalogue at startup so remotely-synced filters,
     // sticker packs and lenses are available without waiting for a network call.
-    LaunchedEffect(Unit) { ContentStore.loadCache(context) }
+    LaunchedEffect(Unit) {
+        ContentStore.loadCache(context)
+        // Filters the user saved themselves, so the strip has them from the first frame.
+        UserFilterStore.load(context)
+    }
 
     NavHost(
         navController = navController,

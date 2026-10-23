@@ -66,6 +66,7 @@ silently producing an unsigned APK.
 | 14 | `camera/` | The look wasn't applied to the **recorded** video — the clip was written straight to the gallery, unfiltered | **fixed** (v1.6.0: recorded to a temp file, filter baked in on stop). Beauty and lenses are still preview-only — they need per-frame face tracking. |
 | 15 | `editor/video/` | No undo/redo; no trim handles beyond the range slider | You could not take back a trim, filter or speed change. **undo/redo fixed** (v1.5.3) |
 | 16 | `ui/components/FilterStrip.kt` | Filter chips were a colour gradient derived from the matrix, which says almost nothing about what the filter does | You had to try every filter to see it. **fixed** (v1.5.2: chips render the filter on a real photo) |
+| 18 | `filters/` | No way to make or keep your own filter — the 75 built-ins were all you got | **fixed** (v1.8.0: save the look on screen as your own filter, in a "Mine" tab, persisted) |
 
 ---
 
@@ -83,6 +84,9 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 7 (feature):** video text/sticker overlays, baked into the export. ✅ v1.5.4 (transitions need a multi-clip timeline — not done)
 - **Step 8 (feature):** the filter is baked into the recorded video. ✅ v1.6.0 (post-process on stop, not live — see the note in `RecordedVideoProcessor`)
 - **Step 9 (feature):** multi-clip timeline — add, trim, reorder and join clips. ✅ v1.7.0 (the foundation transitions need)
-- **Step 10 (feature):** beauty and lenses into the recording; video transitions and reverse.
+- **Step 10 (feature):** save your own filters from the adjust sliders. ✅ v1.8.0
+- **Step 11 (feature):** beauty and lenses into the recording; video transitions and reverse.
+  Transitions need a time-varying alpha, which Media3 only exposes through a custom GL
+  shader — not something to ship without a device to test on.
 
 Each step ends with a signed release so the fixes are installable.

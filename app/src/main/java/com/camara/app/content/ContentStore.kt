@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterCategory
 import com.camara.app.filters.FilterPresets
+import com.camara.app.filters.UserFilterStore
 import com.camara.app.lenses.Lens
 import com.camara.app.lenses.LensCatalog
 import com.camara.app.stickers.StickerPack
@@ -60,9 +61,12 @@ object ContentStore {
     val lenses: List<Lens>
         get() = mergeById(LensCatalog.ALL, remote.lenses) { it.id }
 
-    fun filtersIn(category: FilterCategory): List<Filter> =
-        if (category == FilterCategory.ORIGINAL) listOf(FilterPresets.NONE)
-        else filters.filter { it.category == category }
+    fun filtersIn(category: FilterCategory): List<Filter> = when (category) {
+        FilterCategory.ORIGINAL -> listOf(FilterPresets.NONE)
+        // Read live from the store so a filter saved a moment ago shows up at once.
+        FilterCategory.MINE -> UserFilterStore.all
+        else -> filters.filter { it.category == category }
+    }
 
     fun activeCategories(): List<FilterCategory> =
         FilterCategory.entries.filter { filtersIn(it).isNotEmpty() }

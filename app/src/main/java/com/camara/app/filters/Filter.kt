@@ -11,7 +11,13 @@ enum class FilterCategory(val label: String) {
     CINEMATIC("Cinematic"),
     VINTAGE("Vintage"),
     SNAP("Snap"),
-    SOCIAL("Social")
+    SOCIAL("Social"),
+
+    /**
+     * Filters the user saved themselves. Empty until they make one, and
+     * [FilterPresets.activeCategories] hides the tab until then.
+     */
+    MINE("Mine")
 }
 
 /**

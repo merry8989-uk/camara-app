@@ -48,8 +48,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 16
-        versionName = "1.7.0"
+        versionCode = 17
+        versionName = "1.8.0"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -179,4 +179,8 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    // A real org.json on the unit-test classpath: the android.jar stub throws "Stub!",
+    // and the user-filter format needs a genuine round trip. AGP puts the mockable
+    // android.jar last, so this wins.
+    testImplementation("org.json:json:20240303")
 }

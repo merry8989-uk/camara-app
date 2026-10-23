@@ -43,6 +43,7 @@ import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterCategory
 import com.camara.app.filters.FilterSwatch
 import com.camara.app.filters.FilterThumbnails
+import com.camara.app.filters.UserFilterStore
 import com.camara.app.ui.theme.Accent
 import kotlin.math.roundToInt
 
@@ -64,7 +65,8 @@ fun FilterStrip(
     modifier: Modifier = Modifier,
     intensity: Float = 1f,
     onIntensityChange: ((Float) -> Unit)? = null,
-    thumbnailSource: Bitmap? = null
+    thumbnailSource: Bitmap? = null,
+    onDeleteFilter: ((Filter) -> Unit)? = null
 ) {
     val context = LocalContext.current
     // Initialised from the current selection but NOT keyed on it: keying on `selected`
@@ -147,6 +149,19 @@ fun FilterStrip(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                    // Only a saved filter can be deleted, and only while it is selected,
+                    // so the strip stays uncluttered the rest of the time.
+                    if (isSelected && onDeleteFilter != null && UserFilterStore.isUserFilter(filter.id)) {
+                        Text(
+                            text = "Delete",
+                            color = Color.White.copy(alpha = 0.55f),
+                            fontSize = 10.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onDeleteFilter(filter) }
+                                .padding(horizontal = 6.dp, vertical = 1.dp)
+                        )
+                    }
                 }
             }
         }

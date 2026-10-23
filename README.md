@@ -331,7 +331,7 @@ That single matrix is reused everywhere:
 - [x] Multi-clip timeline — add, trim, reorder and join clips into one video
 - [ ] Video transitions and reverse
 - [ ] Ship a Play-ready App Bundle
-- [ ] Custom filter creation and user presets
+- [x] Save your own filters (the look on screen, kept in a "Mine" tab)
 - [ ] Direct share targets for specific social apps
 
 ---

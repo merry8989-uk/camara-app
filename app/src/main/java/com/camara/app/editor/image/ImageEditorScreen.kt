@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -76,6 +77,8 @@ import androidx.core.net.toUri
 import com.camara.app.core.PhotoProcessor
 import com.camara.app.editor.EditHistory
 import com.camara.app.filters.ColorMatrixMath
+import com.camara.app.filters.FilterPresets
+import com.camara.app.filters.UserFilterStore
 import com.camara.app.portrait.PortraitBokeh
 import com.camara.app.portrait.PortraitSettings
 import com.camara.app.portrait.SubjectSegmenter
@@ -132,6 +135,7 @@ fun ImageEditorScreen(
     }
     var tool by remember { mutableStateOf(EditorTool.NONE) }
     var textDialog by remember { mutableStateOf(false) }
+    var saveFilterDialog by remember { mutableStateOf(false) }
     var drawColor by remember { mutableIntStateOf(0xFFFF2D78.toInt()) }
     var saving by remember { mutableStateOf(false) }
 
@@ -385,7 +389,11 @@ fun ImageEditorScreen(
                     onFlipH = { edit = edit.copy(flipH = !edit.flipH) },
                     onFlipV = { edit = edit.copy(flipV = !edit.flipV) }
                 )
-                EditorTool.ADJUST -> AdjustPanel(edit.adjustments) { edit = edit.copy(adjustments = it) }
+                EditorTool.ADJUST -> AdjustPanel(
+                    adjustments = edit.adjustments,
+                    onChange = { edit = edit.copy(adjustments = it) },
+                    onSaveAsFilter = { saveFilterDialog = true }
+                )
                 EditorTool.FILTER -> Box(Modifier.padding(vertical = 10.dp)) {
                     FilterStrip(
                         selected = edit.filter,
@@ -394,7 +402,13 @@ fun ImageEditorScreen(
                         onIntensityChange = { edit = edit.copy(filterIntensity = it) },
                         // Render the chips on the photo being edited, so the preview is
                         // of this picture rather than a stock sample.
-                        thumbnailSource = previewSource
+                        thumbnailSource = previewSource,
+                        onDeleteFilter = { doomed ->
+                            UserFilterStore.remove(context, doomed.id)
+                            if (edit.filter.id == doomed.id) {
+                                edit = edit.copy(filter = FilterPresets.NONE, filterIntensity = 1f)
+                            }
+                        }
                     )
                 }
                 EditorTool.PORTRAIT -> PortraitEditorPanel(
@@ -437,6 +451,30 @@ fun ImageEditorScreen(
             EditorToolButton(Icons.Filled.FilterFrames, "Frame", tool == EditorTool.FRAME) { tool = toggle(tool, EditorTool.FRAME) }
             EditorToolButton(Icons.Filled.Portrait, "Portrait", tool == EditorTool.PORTRAIT) { tool = toggle(tool, EditorTool.PORTRAIT) }
         }
+    }
+
+    if (saveFilterDialog) {
+        SaveFilterDialog(
+            onDismiss = { saveFilterDialog = false },
+            onSave = { name ->
+                // Exactly the look on screen: the chosen filter at its strength, composed
+                // with the manual adjustments. Saving the composed matrix means the saved
+                // filter renders identically everywhere, with no extra machinery.
+                val look = ColorMatrixMath.compose(
+                    edit.filter.matrixAt(edit.filterIntensity),
+                    edit.adjustments.matrix()
+                )
+                val saved = UserFilterStore.add(context, name, look)
+                // Select it, at full strength, so the result of saving is visible.
+                edit = edit.copy(
+                    filter = saved,
+                    filterIntensity = 1f,
+                    adjustments = Adjustments.DEFAULT
+                )
+                tool = EditorTool.FILTER
+                saveFilterDialog = false
+            }
+        )
     }
 
     if (textDialog) {
@@ -563,12 +601,26 @@ private fun RotatePanel(onRotate: () -> Unit, onFlipH: () -> Unit, onFlipV: () -
 }
 
 @Composable
-private fun AdjustPanel(adjustments: Adjustments, onChange: (Adjustments) -> Unit) {
+private fun AdjustPanel(
+    adjustments: Adjustments,
+    onChange: (Adjustments) -> Unit,
+    onSaveAsFilter: () -> Unit,
+) {
     Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
         AdjustSlider("Brightness", adjustments.brightness, -1f, 1f) { onChange(adjustments.copy(brightness = it)) }
         AdjustSlider("Contrast", adjustments.contrast, 0.5f, 2f) { onChange(adjustments.copy(contrast = it)) }
         AdjustSlider("Saturation", adjustments.saturation, 0f, 2f) { onChange(adjustments.copy(saturation = it)) }
         AdjustSlider("Warmth", adjustments.warmth, -1f, 1f) { onChange(adjustments.copy(warmth = it)) }
+
+        OutlinedButton(
+            onClick = onSaveAsFilter,
+            enabled = !adjustments.isDefault,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
+        ) {
+            Text(if (adjustments.isDefault) "Move a slider to save a filter" else "Save as a filter")
+        }
     }
 }
 
@@ -710,6 +762,35 @@ private fun PortraitEditorPanel(
             fontSize = 10.sp
         )
     }
+}
+
+@Composable
+private fun SaveFilterDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var value by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Save as a filter") },
+        text = {
+            Column {
+                Text(
+                    "Saves the look on screen — the filter, its strength and the " +
+                        "adjustments — as your own filter.",
+                    fontSize = 13.sp
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = true,
+                    label = { Text("Name") },
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(value) }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
