@@ -197,41 +197,46 @@ fun SettingsScreen(
             }
 
             // ------------------------------------------------------------- Updates
-            Section("Updates")
+            // Compiled out of the Play build: Play does not allow an app to install its
+            // own updates, so that build has no updater and no install-packages
+            // permission to go with it.
+            if (BuildConfig.SELF_UPDATE_ENABLED) {
+                Section("Updates")
 
-            val updateState = updater.state
-            Text("Installed version ${BuildConfig.VERSION_NAME}")
+                val updateState = updater.state
+                Text("Installed version ${BuildConfig.VERSION_NAME}")
 
-            when (updateState) {
-                UpdateUiState.Checking -> Text("Checking for updates…")
-                UpdateUiState.UpToDate -> Text("You're on the latest version.")
-                is UpdateUiState.Available -> {
-                    Text("Version ${updateState.info.latestVersion} is available.")
-                    Button(onClick = { updater.install(updateState.info) }) { Text("Update now") }
+                when (updateState) {
+                    UpdateUiState.Checking -> Text("Checking for updates…")
+                    UpdateUiState.UpToDate -> Text("You're on the latest version.")
+                    is UpdateUiState.Available -> {
+                        Text("Version ${updateState.info.latestVersion} is available.")
+                        Button(onClick = { updater.install(updateState.info) }) { Text("Update now") }
+                    }
+                    UpdateUiState.Downloading -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        Text("Downloading update…")
+                    }
+                    is UpdateUiState.Failed -> Text("Update failed: ${updateState.message}")
+                    UpdateUiState.Idle -> Unit
                 }
-                UpdateUiState.Downloading -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+
+                OutlinedButton(
+                    onClick = { updater.check(BuildConfig.VERSION_NAME) },
+                    enabled = updateState !is UpdateUiState.Checking &&
+                        updateState !is UpdateUiState.Downloading,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    Text("Downloading update…")
+                    Text("Check for updates")
                 }
-                is UpdateUiState.Failed -> Text("Update failed: ${updateState.message}")
-                UpdateUiState.Idle -> Unit
+                Text(
+                    "Downloads the signed APK and installs it here — no browser needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
-
-            OutlinedButton(
-                onClick = { updater.check(BuildConfig.VERSION_NAME) },
-                enabled = updateState !is UpdateUiState.Checking &&
-                    updateState !is UpdateUiState.Downloading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Check for updates")
-            }
-            Text(
-                "Downloads the signed APK and installs it here — no browser needed.",
-                style = MaterialTheme.typography.bodySmall,
-            )
 
             // ---------------------------------------------------------- Diagnostics
             DiagnosticsSection(

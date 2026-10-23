@@ -48,14 +48,14 @@ jobs:
       # Unit tests cover the colour-matrix engine (the core of every filter, the strength
       # slider and the beauty grade) and the filter catalogue's integrity.
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace --no-daemon
+        run: ./gradlew testSideloadDebugUnitTest --stacktrace --no-daemon
 
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-report
-          path: app/build/reports/tests/testDebugUnitTest/
+          path: app/build/reports/tests/testSideloadDebugUnitTest/
           if-no-files-found: ignore
 
       # The signing keystore is NOT in the repository. It is stored as a base64
@@ -72,7 +72,11 @@ jobs:
           printf '%s' "${{ secrets.CAMARA_KEYSTORE_BASE64 }}" | base64 -d > keystore/camara-dev.p12
           ls -l keystore/camara-dev.p12
 
-      - name: Build signed release APK
+      # Two artefacts from one codebase:
+      #   sideload - the APK people download here, with the in-app updater.
+      #   play     - the App Bundle for the Play Store, which must not carry the
+      #              install-packages permission (Play rejects self-updating apps).
+      - name: Build the sideload APK and the Play bundle
         env:
           # Absolute path on purpose: a relative one would resolve against the app
           # module directory, not the repo root.
@@ -81,22 +85,29 @@ jobs:
           CAMARA_REQUIRE_SIGNING: 'true'
           CAMARA_STORE_PASSWORD: ${{ secrets.CAMARA_STORE_PASSWORD }}
           CAMARA_KEY_PASSWORD: ${{ secrets.CAMARA_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --stacktrace --no-daemon
+        run: ./gradlew assembleSideloadRelease bundlePlayRelease --stacktrace --no-daemon
 
       # Upload first, so the APK is always retrievable even if the check below fails.
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: camara-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/sideload/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload Play bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: camara-play-aab
+          path: app/build/outputs/bundle/playRelease/*.aab
           if-no-files-found: error
 
       - name: Verify signing certificate
         run: |
           set -e
-          ls -l app/build/outputs/apk/release/
-          APK=$(ls app/build/outputs/apk/release/app-release.apk 2>/dev/null \
-                || ls app/build/outputs/apk/release/*.apk | head -n1)
+          ls -l app/build/outputs/apk/sideload/release/
+          APK=$(ls app/build/outputs/apk/sideload/release/app-sideload-release.apk 2>/dev/null \
+                || ls app/build/outputs/apk/sideload/release/*.apk | head -n1)
           echo "APK: $APK"
           if ! unzip -l "$APK" | grep -qiE 'META-INF/.*\.(RSA|DSA|EC|SF)'; then
             echo "::error::APK has no v1 signature — it is unsigned or signing failed."
@@ -119,6 +130,12 @@ jobs:
           name: camara-release-apk
           path: dist
 
+      - name: Download the Play bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: camara-play-aab
+          path: dist
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -127,18 +144,18 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           ls -l dist
 
-          # Name the asset after the release. CI builds app-release.apk; every hand-made
-          # release has shipped camara-<version>.apk, and the in-app updater picks the
-          # first .apk asset, so the name only matters for people downloading by hand.
-          mv dist/app-release.apk "dist/camara-${TAG}.apk"
+          # Name the assets after the release. The in-app updater picks the first .apk
+          # asset, so the name only matters for people downloading by hand.
+          mv dist/app-sideload-release.apk "dist/camara-${TAG}.apk"
+          mv dist/app-play-release.aab "dist/camara-${TAG}.aab"
           ls -l dist
 
           # A release may already exist: created as a draft so the notes can be written by
           # hand. In that case attach the APK and publish it, rather than leaving the
           # draft without an asset.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG exists — attaching the APK."
-            gh release upload "$TAG" dist/*.apk --repo "$GITHUB_REPOSITORY" --clobber
+            echo "Release $TAG exists — attaching the APK and the Play bundle."
+            gh release upload "$TAG" dist/*.apk dist/*.aab --repo "$GITHUB_REPOSITORY" --clobber
             if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft)" = "true" ]; then
               echo "Publishing the draft."
               gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
@@ -146,7 +163,7 @@ jobs:
             exit 0
           fi
 
-          gh release create "$TAG" dist/*.apk \
+          gh release create "$TAG" dist/*.apk dist/*.aab \
             --repo "$GITHUB_REPOSITORY" \
             --title "Camara $TAG" \
             --generate-notes \

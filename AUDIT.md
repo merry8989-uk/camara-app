@@ -87,7 +87,9 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 10 (feature):** save your own filters from the adjust sliders. ✅ v1.8.0
 - **Step 11 (feature):** fade-to-black transitions between clips. ✅ v1.9.0 — Media3's
   `RgbMatrix` is evaluated per frame, so a real time-varying fade needs no custom shader.
-- **Step 12 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
-  shader); reverse; beauty and lenses into the recording.
+- **Step 12 (distribution):** a Play-ready App Bundle. ✅ v1.10.0 — a `play` flavour that
+  drops the self-updater and the install-packages permission, plus `PLAY.md`.
+- **Step 13 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
+  shader); reverse; beauty and lenses into the recording; direct share targets.
 
 Each step ends with a signed release so the fixes are installable.

@@ -48,8 +48,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 18
-        versionName = "1.9.0"
+        versionCode = 19
+        versionName = "1.10.0"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -76,6 +76,24 @@ android {
                 enableV2Signing = true
                 enableV3Signing = true
             }
+        }
+    }
+
+    // Two channels from one codebase.
+    //
+    // Play does not allow an app to install its own updates: REQUEST_INSTALL_PACKAGES
+    // requires a declaration and a camera app does not qualify, so a Play build must not
+    // carry it. Flavours let the sideload build keep the in-app updater while the Play
+    // build compiles it out and drops the permission via the flavour manifest.
+    flavorDimensions += "channel"
+    productFlavors {
+        create("sideload") {
+            dimension = "channel"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
+        }
+        create("play") {
+            dimension = "channel"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
         }
     }
 

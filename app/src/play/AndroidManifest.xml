@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      The Play build does not install its own updates, so it must not ask for the
+      permission to. Play requires a declaration for REQUEST_INSTALL_PACKAGES and grants
+      it only to a narrow set of apps; a camera app is not one of them, so leaving it in
+      would get the upload rejected.
+
+      The sideload build (what the GitHub release ships) keeps it, and keeps the in-app
+      updater with it.
+    -->
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+
+</manifest>

@@ -331,9 +331,11 @@ That single matrix is reused everywhere:
 - [x] Multi-clip timeline — add, trim, reorder and join clips into one video
 - [x] Fade-to-black transitions between clips
 - [ ] Crossfade (needs a hand-written GL shader) and reverse
-- [ ] Ship a Play-ready App Bundle
+- [x] Play-ready App Bundle (a `play` flavour with the self-updater removed)
 - [x] Save your own filters (the look on screen, kept in a "Mine" tab)
 - [ ] Direct share targets for specific social apps
+
+See [`PLAY.md`](PLAY.md) for how the Play bundle is built and signed.
 
 ---
 
