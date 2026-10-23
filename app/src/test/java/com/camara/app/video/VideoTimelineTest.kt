@@ -55,8 +55,9 @@ class VideoTimelineTest {
     fun `total duration sums the trimmed clips`() {
         assertEquals(3_500f, three.totalDurationMs, 0.01f)
 
+        // Clip 2 shrinks from 2000 to 1000, so 1000 + 1000 + 500.
         val trimmed = three.replace(clip(2, 2_000f, start = 500f, end = 1_500f))
-        assertEquals(2_000f, trimmed.totalDurationMs, 0.01f)
+        assertEquals(2_500f, trimmed.totalDurationMs, 0.01f)
     }
 
     @Test
