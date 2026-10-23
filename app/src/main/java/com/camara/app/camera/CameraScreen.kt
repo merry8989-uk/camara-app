@@ -103,6 +103,7 @@ import com.camara.app.util.BitmapUtils
 import com.camara.app.util.MediaStoreUtils
 import com.camara.app.util.Permissions
 import android.widget.Toast
+import java.io.File
 import androidx.compose.runtime.mutableFloatStateOf
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
