@@ -328,7 +328,8 @@ That single matrix is reused everywhere:
 - [x] Signing key moved to repository secrets (never committed)
 - [x] Unit tests for the filter maths, blur, undo history and frame fitting
 - [ ] Beauty and AR lenses baked into the recorded video (needs per-frame face tracking)
-- [ ] Video transitions and reverse (needs a multi-clip timeline)
+- [x] Multi-clip timeline — add, trim, reorder and join clips into one video
+- [ ] Video transitions and reverse
 - [ ] Ship a Play-ready App Bundle
 - [ ] Custom filter creation and user presets
 - [ ] Direct share targets for specific social apps

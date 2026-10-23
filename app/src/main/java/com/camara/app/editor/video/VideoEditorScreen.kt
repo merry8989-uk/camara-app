@@ -6,7 +6,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Canvas as ComposeCanvas
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -16,15 +19,20 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TextFields
@@ -68,6 +76,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
@@ -78,6 +87,8 @@ import androidx.media3.ui.PlayerView
 import com.camara.app.editor.EditHistory
 import com.camara.app.filters.Filter
 import com.camara.app.video.FrameFit
+import com.camara.app.video.TimelineClip
+import com.camara.app.video.VideoTimeline
 import com.camara.app.video.VideoOverlay
 import com.camara.app.video.VideoOverlays
 import com.camara.app.filters.FilterPresets
@@ -107,9 +118,13 @@ fun VideoEditorScreen(
         onDispose { exo.release() }
     }
 
-    var durationMs by remember { mutableFloatStateOf(0f) }
-    var range by remember { mutableStateOf(0f..0f) }
+    // The timeline is the source of truth: an ordered list of trimmed clips that plays and
+    // exports as one video. A single recording is simply a timeline of one.
+    var timeline by remember { mutableStateOf(VideoTimeline()) }
+    var selectedClipId by remember { mutableStateOf<Long?>(null) }
     var filter by remember { mutableStateOf<Filter>(FilterPresets.NONE) }
+    val durationMs = timeline.totalDurationMs
+    val selectedClip = timeline.clip(selectedClipId ?: -1L)
     var speed by remember { mutableFloatStateOf(1f) }
     var exporting by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -138,15 +153,19 @@ fun VideoEditorScreen(
     // values themselves — so the effect below sees them equal and doesn't record the undo
     // as a fresh edit.
     val history = remember { EditHistory<VideoEdit>() }
-    var historyBaseline by remember { mutableStateOf(VideoEdit(0f..0f, FilterPresets.NONE, 1f)) }
-    val currentEdit = VideoEdit(range, filter, speed, overlays)
+    var historyBaseline by remember { mutableStateOf(VideoEdit(VideoTimeline(), FilterPresets.NONE, 1f)) }
+    val currentEdit = VideoEdit(timeline, filter, speed, overlays)
 
     fun restore(target: VideoEdit) {
         historyBaseline = target
-        range = target.range
+        timeline = target.timeline
         filter = target.filter
         speed = target.speed
         overlays = target.overlays
+        // Undo can remove the clip that was selected; fall back to the first one.
+        if (timeline.clip(selectedClipId ?: -1L) == null) {
+            selectedClipId = timeline.clips.firstOrNull()?.id
+        }
     }
 
     LaunchedEffect(currentEdit) {
@@ -164,40 +183,57 @@ fun VideoEditorScreen(
         restore(history.redo(currentEdit) ?: return)
     }
 
+    // Adds another clip to the timeline, read from the gallery.
+    val pickClip = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val meta = readVideoMeta(context, uri)
+            val clip = TimelineClip(
+                id = System.currentTimeMillis(),
+                uri = uri.toString(),
+                sourceDurationMs = meta.first.toFloat(),
+            )
+            timeline = timeline.add(clip)
+            selectedClipId = clip.id
+        }
+    }
+
     LaunchedEffect(sourceUri) {
         if (sourceUri == null) return@LaunchedEffect
-        val meta = withContext(Dispatchers.IO) {
-            val r = MediaMetadataRetriever()
-            try {
-                r.setDataSource(context, sourceUri)
-                val duration = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
-                var w = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-                var h = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-                // A portrait clip is often stored landscape with a rotation flag, so the
-                // reported dimensions have to be swapped for the overlay maths to line up.
-                val rotation = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-                if (rotation == 90 || rotation == 270) {
-                    val t = w; w = h; h = t
-                }
-                Triple(duration, w, h)
-            } catch (t: Throwable) {
-                Triple(0L, 0, 0)
-            } finally {
-                try { r.release() } catch (_: Throwable) { }
-            }
-        }
-        val dur = meta.first
+        val meta = readVideoMeta(context, sourceUri)
         // Fall back to a portrait frame so overlays still land sensibly if the metadata
         // is missing.
         videoWidth = if (meta.second > 0) meta.second else 1080
         videoHeight = if (meta.third > 0) meta.third else 1920
-        durationMs = dur.toFloat()
-        range = 0f..dur.toFloat()
-        // The loaded state is the starting point, not an edit: undo should never take the
-        // trim range back to zero.
-        historyBaseline = VideoEdit(range, filter, speed, overlays)
+
+        val opened = TimelineClip(
+            id = System.currentTimeMillis(),
+            uri = sourceUri.toString(),
+            sourceDurationMs = meta.first.toFloat(),
+        )
+        timeline = VideoTimeline(listOf(opened))
+        selectedClipId = opened.id
+        // The loaded state is the starting point, not an edit.
+        historyBaseline = VideoEdit(timeline, filter, speed, overlays)
         history.clear()
-        exo.setMediaItem(MediaItem.fromUri(sourceUri))
+    }
+
+    // The preview plays the **selected clip** at its trim. Export plays the whole timeline,
+    // in order. Re-preparing is debounced so dragging a trim slider doesn't restart the
+    // player on every tick.
+    LaunchedEffect(selectedClipId, selectedClip?.uri, selectedClip?.trimStartMs, selectedClip?.trimEndMs) {
+        val clip = selectedClip ?: return@LaunchedEffect
+        delay(250)
+        val item = MediaItem.Builder()
+            .setUri(clip.uri)
+            .setClippingConfiguration(
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(clip.startMs().toLong())
+                    .setEndPositionMs(clip.endMs().toLong())
+                    .build()
+            )
+            .build()
+        exo.setMediaItem(item)
         exo.prepare()
     }
 
@@ -219,25 +255,34 @@ fun VideoEditorScreen(
     }
 
     fun export(shareAfter: Boolean) {
-        val uri = sourceUri ?: return
+        if (timeline.isEmpty) return
         exporting = true
         progress = 0f
 
         val output = File(context.cacheDir, "camara/export_${System.currentTimeMillis()}.mp4")
         output.parentFile?.mkdirs()
 
-        val startMs = range.start.toLong()
-        val endMs = if (range.endInclusive <= 0f) C.TIME_END_OF_SOURCE else range.endInclusive.toLong()
-
-        val mediaItem = MediaItem.Builder()
-            .setUri(uri)
-            .setClippingConfiguration(
-                MediaItem.ClippingConfiguration.Builder()
-                    .setStartPositionMs(startMs)
-                    .setEndPositionMs(endMs)
-                    .build()
-            )
-            .build()
+        // Every clip becomes one item, and all the items go in a single sequence — that is
+        // what makes them play one after another instead of over each other.
+        val items = timeline.clips.map { clip ->
+            val mediaItem = MediaItem.Builder()
+                .setUri(clip.uri)
+                .setClippingConfiguration(
+                    MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(clip.startMs().toLong())
+                        .setEndPositionMs(clip.endMs().toLong())
+                        .build()
+                )
+                .build()
+            val item = EditedMediaItem.Builder(mediaItem)
+            if (speed != 1f) {
+                item.setSpeed(VideoEffects.speedProvider(speed))
+                // Cap the output frame rate so fast-forward exports don't balloon.
+                if (speed > 1f) item.setFrameRate(30)
+            }
+            item.build()
+        }
+        val sequence = EditedMediaItemSequence.Builder(items).build()
 
         // Overlays are baked in here, so what the preview showed is what lands in the file.
         val videoEffects = buildList {
@@ -245,14 +290,11 @@ fun VideoEditorScreen(
             VideoOverlays.overlayEffect(overlays, videoWidth, videoHeight)?.let { add(it) }
         }
 
-        val builder = EditedMediaItem.Builder(mediaItem)
+        // The filter and the overlays apply to the whole timeline, so they go on the
+        // composition rather than on each clip.
+        val compositionToExport = Composition.Builder(sequence)
             .setEffects(Effects(emptyList(), videoEffects))
-        if (speed != 1f) {
-            builder.setSpeed(VideoEffects.speedProvider(speed))
-            // Cap the output frame rate so fast-forward exports don't balloon.
-            if (speed > 1f) builder.setFrameRate(30)
-        }
-        val edited = builder.build()
+            .build()
 
         val transformer = Transformer.Builder(context)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
@@ -294,7 +336,7 @@ fun VideoEditorScreen(
             .build()
 
         transformerRef = transformer
-        transformer.start(edited, output.absolutePath)
+        transformer.start(compositionToExport, output.absolutePath)
     }
 
     Column(
@@ -433,29 +475,146 @@ fun VideoEditorScreen(
             }
         }
 
-        // Trim
+        // Clips: the timeline, plus the trim of whichever clip is selected.
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.ContentCut, contentDescription = null, tint = Color.White.copy(alpha = 0.8f))
                 Text(
-                    "Trim",
+                    if (timeline.clips.size == 1) "Clip" else "Clips (${timeline.clips.size})",
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(start = 8.dp)
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "${fmt(range.start)} – ${fmt(range.endInclusive)}",
+                    "Total ${fmt(durationMs)}",
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 12.sp
                 )
             }
-            if (durationMs > 0f) {
-                RangeSlider(
-                    value = range,
-                    onValueChange = { range = it },
-                    valueRange = 0f..durationMs
-                )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 6.dp)
+            ) {
+                items(timeline.clips, key = { it.id }) { clip ->
+                    val isSelected = clip.id == selectedClipId
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isSelected) Accent.copy(alpha = 0.30f)
+                                else Color.White.copy(alpha = 0.08f)
+                            )
+                            .border(
+                                width = if (isSelected) 1.5.dp else 0.dp,
+                                color = if (isSelected) Accent else Color.Transparent,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable { selectedClipId = clip.id }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            "Clip ${timeline.indexOf(clip.id) + 1}",
+                            color = Color.White,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            fmt(clip.durationMs),
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                item {
+                    Text(
+                        "+ Add",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Accent.copy(alpha = 0.85f))
+                            .clickable { pickClip.launch("video/*") }
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    )
+                }
+            }
+
+            selectedClip?.let { clip ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Text(
+                        "Trim",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.width(38.dp)
+                    )
+                    if (clip.sourceDurationMs > 0f) {
+                        RangeSlider(
+                            value = clip.startMs()..clip.endMs(),
+                            onValueChange = { r ->
+                                timeline = timeline.replace(clip.trimmed(r.start, r.endInclusive))
+                            },
+                            valueRange = 0f..clip.sourceDurationMs,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    IconButton(onClick = {
+                        val removing = clip.id
+                        timeline = timeline.remove(removing)
+                        if (selectedClipId == removing) {
+                            selectedClipId = timeline.clips.firstOrNull()?.id
+                        }
+                    }) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = "Remove clip",
+                            tint = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Move",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp
+                    )
+                    listOf("\u2190" to -1, "\u2192" to 1).forEach { (label, delta) ->
+                        Text(
+                            label,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.10f))
+                                .clickable { timeline = timeline.moved(clip.id, delta) }
+                                .padding(horizontal = 12.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "${fmt(clip.startMs())} – ${fmt(clip.endMs())}",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp
+                    )
+                }
+
+                if (timeline.clips.size == 1) {
+                    Text(
+                        "Add another clip to join it to this one. The preview plays the " +
+                            "selected clip; Export plays them all in order.",
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
         }
 
@@ -471,7 +630,7 @@ fun VideoEditorScreen(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    if (durationMs > 0f) "Output ${fmt(range.let { (it.endInclusive - it.start) } / speed)}" else "",
+                    if (durationMs > 0f) "Output ${fmt(durationMs / speed)}" else "",
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 12.sp
                 )
@@ -582,11 +741,37 @@ private fun AddOverlayTextDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit)
 
 /** Everything the video editor lets you change. */
 private data class VideoEdit(
-    val range: ClosedFloatingPointRange<Float>,
+    val timeline: VideoTimeline,
     val filter: Filter,
     val speed: Float,
     val overlays: List<VideoOverlay> = emptyList(),
 )
+
+/**
+ * Duration and frame size of a video, with the rotation flag applied.
+ *
+ * A portrait clip is usually stored landscape with a rotation flag, so the reported
+ * dimensions have to be swapped or overlays land sideways.
+ */
+private suspend fun readVideoMeta(context: android.content.Context, uri: Uri): Triple<Long, Int, Int> =
+    withContext(Dispatchers.IO) {
+        val r = MediaMetadataRetriever()
+        try {
+            r.setDataSource(context, uri)
+            val duration = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0L
+            var w = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            var h = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val rotation = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            if (rotation == 90 || rotation == 270) {
+                val t = w; w = h; h = t
+            }
+            Triple(duration, w, h)
+        } catch (t: Throwable) {
+            Triple(0L, 0, 0)
+        } finally {
+            try { r.release() } catch (_: Throwable) { }
+        }
+    }
 
 private fun fmt(ms: Float): String {
     val totalSeconds = (ms / 1000f).toInt().coerceAtLeast(0)

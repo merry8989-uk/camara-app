@@ -61,7 +61,7 @@ silently producing an unsigned APK.
 | 10 | whole app | **No unit tests at all** | The colour-matrix maths — the core of every filter — has never been verified by a test. **fixed** (JVM tests added) |
 | 11 | `camera/CameraController.kt` | `rebind()` ran on every lens toggle (analysis was only bound while a lens was active) | Visible preview flicker each time a lens was turned on or off. **fixed** (v1.5.1: analysis always bound, only the analyzer is attached/detached) |
 | 12 | `editor/video/` | No text/sticker overlays | **fixed** (v1.5.4: timed text and sticker overlays, baked into the export) |
-| 17 | `editor/video/` | No transitions or reverse, and still single-clip | Feature gap — needs a multi-clip timeline. |
+| 17 | `editor/video/` | Single-clip only, so no way to join clips and nothing to transition between | **multi-clip done** (v1.7.0: add, trim, reorder and join clips). Transitions and reverse still pending. |
 | 13 | `editor/` | No undo/redo | Feature gap — the single most-requested editing affordance. **fixed** (v1.4.2) |
 | 14 | `camera/` | The look wasn't applied to the **recorded** video — the clip was written straight to the gallery, unfiltered | **fixed** (v1.6.0: recorded to a temp file, filter baked in on stop). Beauty and lenses are still preview-only — they need per-frame face tracking. |
 | 15 | `editor/video/` | No undo/redo; no trim handles beyond the range slider | You could not take back a trim, filter or speed change. **undo/redo fixed** (v1.5.3) |
@@ -82,6 +82,7 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 6 (P2):** undo/redo in the video editor, on a shared + tested [EditHistory]. ✅ v1.5.3
 - **Step 7 (feature):** video text/sticker overlays, baked into the export. ✅ v1.5.4 (transitions need a multi-clip timeline — not done)
 - **Step 8 (feature):** the filter is baked into the recorded video. ✅ v1.6.0 (post-process on stop, not live — see the note in `RecordedVideoProcessor`)
-- **Step 9 (feature):** beauty and lenses into the recording; video transitions and reverse.
+- **Step 9 (feature):** multi-clip timeline — add, trim, reorder and join clips. ✅ v1.7.0 (the foundation transitions need)
+- **Step 10 (feature):** beauty and lenses into the recording; video transitions and reverse.
 
 Each step ends with a signed release so the fixes are installable.
