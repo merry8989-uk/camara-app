@@ -15,9 +15,14 @@ import com.camara.app.filters.Filter
  */
 object VideoEffects {
 
-    fun forFilter(filter: Filter, height: Int = 1080): List<Effect> {
+    /**
+     * @param height the height to scale the output to, or null to leave the size alone.
+     *   The camera passes null: its recording is already the right size, and forcing a
+     *   height would upscale a 720p clip to 1080p for no reason.
+     */
+    fun forFilter(filter: Filter, height: Int? = 1080): List<Effect> {
         val effects = mutableListOf<Effect>()
-        effects.add(Presentation.createForHeight(height))
+        if (height != null) effects.add(Presentation.createForHeight(height))
         if (!filter.isIdentity) {
             val m = filter.matrix
             val matrix4x4 = floatArrayOf(

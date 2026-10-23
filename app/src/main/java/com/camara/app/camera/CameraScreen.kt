@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Slider
@@ -101,6 +102,9 @@ import com.camara.app.ui.theme.Accent
 import com.camara.app.util.BitmapUtils
 import com.camara.app.util.MediaStoreUtils
 import com.camara.app.util.Permissions
+import android.widget.Toast
+import androidx.compose.runtime.mutableFloatStateOf
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -173,6 +177,9 @@ private fun CameraContent(
     var panel by remember { mutableStateOf(CameraPanel.NONE) }
     var stickers by remember { mutableStateOf(listOf<PlacedSticker>()) }
     var countdown by remember { mutableIntStateOf(0) }
+    // Applying the look to a finished recording takes a moment, so it is shown.
+    var processing by remember { mutableStateOf(false) }
+    var processProgress by remember { mutableFloatStateOf(0f) }
     var showTeleprompter by remember { mutableStateOf(false) }
     var showContent by remember { mutableStateOf(false) }
     // Why a face feature may not work: the ML models are unbundled and need Play Services.
@@ -225,7 +232,63 @@ private fun CameraContent(
             if (controller.isRecording) {
                 controller.stopRecording()
             } else {
-                controller.startRecording { uri -> onEditVideo(uri) }
+                // The look is captured now, so changing the filter mid-recording doesn't
+                // change what gets baked into the clip that is already being written.
+                val look = controller.filter
+                controller.startRecording { file ->
+                    scope.launch {
+                        processing = true
+                        processProgress = 0f
+                        val uri = RecordedVideoProcessor.process(
+                            context = context,
+                            source = file,
+                            filter = look,
+                            onProgress = { processProgress = it }
+                        )
+                        processing = false
+                        if (uri != null) {
+                            onEditVideo(uri)
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Couldn't save the recording",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (processing) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xCC000000)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = Accent)
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "Applying the filter…",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${(processProgress * 100).roundToInt()}%",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Your clip is safe — this only changes how it looks.",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 11.sp
+                )
             }
         }
     }

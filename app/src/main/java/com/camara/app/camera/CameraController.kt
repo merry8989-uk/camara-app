@@ -17,7 +17,7 @@ import androidx.camera.core.UseCase
 import androidx.camera.core.ZoomState
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
-import androidx.camera.video.MediaStoreOutputOptions
+import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
@@ -320,14 +320,19 @@ class CameraController(private val context: Context) {
         )
     }
 
-    fun startRecording(onSaved: (Uri) -> Unit) {
+    /**
+     * Records to a temporary file and reports it once finalised.
+     *
+     * Not to the gallery directly: the look has to be applied to the clip first, and the
+     * camera can only see the filter it was given. [RecordedVideoProcessor] takes it from
+     * here.
+     */
+    fun startRecording(onRecorded: (File) -> Unit) {
         val vc = videoCapture ?: return
         if (isRecording) return
 
-        val options = MediaStoreOutputOptions.Builder(
-            context.contentResolver,
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        ).build()
+        val target = RecordedVideoProcessor.newRecordingFile(context)
+        val options = FileOutputOptions.Builder(target).build()
 
         var pending = vc.output.prepareRecording(context, options)
         if (hasAudioPermission()) pending = pending.withAudioEnabled()
@@ -339,8 +344,9 @@ class CameraController(private val context: Context) {
                     isRecording = false
                     if (event.hasError()) {
                         errorMessage = "Recording error (${event.error})"
+                        target.delete()
                     } else {
-                        onSaved(event.outputResults.outputUri)
+                        onRecorded(target)
                     }
                 }
                 else -> Unit

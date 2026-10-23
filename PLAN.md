@@ -120,13 +120,13 @@ per run. Different certificate → Android rejects the update → uninstall requ
 
 ## 3. Next up (planned)
 
-1. **Recorded-video effects** — apply the live look to the recorded stream, not just
-   the preview (needs a GL pipeline rather than `RenderEffect`).
-2. **Undo/redo** — an edit stack in both editors.
-3. **Video overlays** — text, stickers and transitions in the video editor.
-4. **Custom filters** — build a look from the adjust sliders and save it as a preset.
-5. **Release signing** — a proper keystore and a Play-ready AAB.
-6. **Direct share targets** — one-tap share to specific apps.
+1. **Beauty and lenses in recordings** — the filter is baked in now; beauty and AR lenses
+   still only appear on the preview, because both need per-frame face tracking. A real-time
+   GL pipeline (`CameraEffect`) would do it, but it switches off Camera Extensions.
+2. **Video transitions and reverse** — both need a multi-clip timeline.
+3. **Custom filters** — build a look from the adjust sliders and save it as a preset.
+4. **Play-ready App Bundle** — the keystore is done; `bundleRelease` is not wired yet.
+5. **Direct share targets** — one-tap share to specific apps.
 
 ---
 
@@ -143,3 +143,6 @@ per run. Different certificate → Android rejects the update → uninstall requ
 - `segmentation-selfie` and `face-detection` are ML Kit **beta/stable** on-device
   models; they add roughly 10 MB to the APK.
 - Nothing has been verified on physical hardware by the author — see the release notes.
+- Baking the filter into a recording is a **post-process**: the clip is written unfiltered
+  and the look is applied in one pass when recording stops, so there is a short pause
+  afterwards. It is not a live effect on the recording stream.

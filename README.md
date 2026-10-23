@@ -319,13 +319,16 @@ That single matrix is reused everywhere:
 - [x] Video speed effects
 - [x] AR face-tracking masks and lenses
 - [x] Share sheet
-- [ ] Non-destructive edit history with undo/redo
-- [ ] Video reverse effects, text/sticker overlays and transitions
-- [ ] Live filter + lens applied to the *recorded* video stream (not just the preview)
+- [x] Undo/redo in both editors
+- [x] Video text and sticker overlays, with per-overlay timing
+- [x] Filter baked into the recorded video (applied when recording stops)
 - [x] Remote content catalogue (filters / stickers / lenses synced without an app release)
 - [x] Small APK via unbundled ML Kit + R8 (no OBB needed)
 - [x] Stable signing so builds update in place
 - [x] Signing key moved to repository secrets (never committed)
+- [x] Unit tests for the filter maths, blur, undo history and frame fitting
+- [ ] Beauty and AR lenses baked into the recorded video (needs per-frame face tracking)
+- [ ] Video transitions and reverse (needs a multi-clip timeline)
 - [ ] Ship a Play-ready App Bundle
 - [ ] Custom filter creation and user presets
 - [ ] Direct share targets for specific social apps

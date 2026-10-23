@@ -285,9 +285,12 @@
     <li>Android 7.0 (API 24) or newer. arm64 and armeabi-v7a devices.</li>
     <li>Face lenses, face beauty and portrait depth need Google Play Services. The app tells
         you when they aren't available instead of failing silently.</li>
-    <li>The live look applies to the preview and to saved photos; it is not yet baked into
-        recorded video.</li>
-    <li>The video editor does not yet do text overlays, stickers or transitions.</li>
+    <li><b>Filters are baked into recorded video</b> — the clip is written unfiltered and the
+        look is applied in one pass when you stop recording, so there is a short pause
+        afterwards. Beauty and AR lenses still appear on the preview only, because both
+        need per-frame face tracking.</li>
+    <li>The video editor does text, stickers, trim, speed and filters, but not yet
+        <b>transitions</b> or <b>reverse</b> — both need a multi-clip timeline.</li>
   </ul>
 </section>
 

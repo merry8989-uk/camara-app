@@ -63,7 +63,7 @@ silently producing an unsigned APK.
 | 12 | `editor/video/` | No text/sticker overlays | **fixed** (v1.5.4: timed text and sticker overlays, baked into the export) |
 | 17 | `editor/video/` | No transitions or reverse, and still single-clip | Feature gap — needs a multi-clip timeline. |
 | 13 | `editor/` | No undo/redo | Feature gap — the single most-requested editing affordance. **fixed** (v1.4.2) |
-| 14 | `camera/` | Live look isn't applied to the **recorded** video stream | Feature gap (needs a GL pipeline, not `RenderEffect`). |
+| 14 | `camera/` | The look wasn't applied to the **recorded** video — the clip was written straight to the gallery, unfiltered | **fixed** (v1.6.0: recorded to a temp file, filter baked in on stop). Beauty and lenses are still preview-only — they need per-frame face tracking. |
 | 15 | `editor/video/` | No undo/redo; no trim handles beyond the range slider | You could not take back a trim, filter or speed change. **undo/redo fixed** (v1.5.3) |
 | 16 | `ui/components/FilterStrip.kt` | Filter chips were a colour gradient derived from the matrix, which says almost nothing about what the filter does | You had to try every filter to see it. **fixed** (v1.5.2: chips render the filter on a real photo) |
 
@@ -81,6 +81,7 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 5b (UX):** filter chips render the actual filter on a real photo. ✅ v1.5.2
 - **Step 6 (P2):** undo/redo in the video editor, on a shared + tested [EditHistory]. ✅ v1.5.3
 - **Step 7 (feature):** video text/sticker overlays, baked into the export. ✅ v1.5.4 (transitions need a multi-clip timeline — not done)
-- **Step 8 (feature):** apply the live look to the recorded video stream (GL pipeline).
+- **Step 8 (feature):** the filter is baked into the recorded video. ✅ v1.6.0 (post-process on stop, not live — see the note in `RecordedVideoProcessor`)
+- **Step 9 (feature):** beauty and lenses into the recording; video transitions and reverse.
 
 Each step ends with a signed release so the fixes are installable.
