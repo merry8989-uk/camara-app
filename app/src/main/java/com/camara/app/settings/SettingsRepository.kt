@@ -33,6 +33,7 @@ class SettingsRepository(private val context: Context) {
         val MIRROR_SELFIE = booleanPreferencesKey("mirror_selfie")
         val GRID = booleanPreferencesKey("grid_by_default")
         val TIMER = intPreferencesKey("timer_seconds")
+        val APP_LOCK = booleanPreferencesKey("app_lock")
         fun flag(id: String) = booleanPreferencesKey("flag_$id")
     }
 
@@ -51,6 +52,7 @@ class SettingsRepository(private val context: Context) {
             mirrorSelfie = p[Keys.MIRROR_SELFIE] ?: true,
             gridByDefault = p[Keys.GRID] ?: false,
             timerSeconds = p[Keys.TIMER] ?: 0,
+            appLockEnabled = p[Keys.APP_LOCK] ?: false,
             featureFlags = FeatureFlag.entries.associate { flag ->
                 flag.id to (p[Keys.flag(flag.id)] ?: flag.defaultOn)
             }
@@ -67,6 +69,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setImmersive(enabled: Boolean) = edit { it[Keys.IMMERSIVE] = enabled }
     suspend fun setMirrorSelfie(enabled: Boolean) = edit { it[Keys.MIRROR_SELFIE] = enabled }
     suspend fun setGridByDefault(enabled: Boolean) = edit { it[Keys.GRID] = enabled }
+    suspend fun setAppLock(enabled: Boolean) = edit { it[Keys.APP_LOCK] = enabled }
     suspend fun setTimerSeconds(seconds: Int) = edit { it[Keys.TIMER] = seconds }
 
     suspend fun setFeatureFlag(id: String, enabled: Boolean) = edit { it[Keys.flag(id)] = enabled }

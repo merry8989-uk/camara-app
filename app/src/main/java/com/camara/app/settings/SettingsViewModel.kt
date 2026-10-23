@@ -25,6 +25,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setImmersive(enabled: Boolean) = viewModelScope.launch { repo.setImmersive(enabled) }
     fun setMirrorSelfie(enabled: Boolean) = viewModelScope.launch { repo.setMirrorSelfie(enabled) }
     fun setGridByDefault(enabled: Boolean) = viewModelScope.launch { repo.setGridByDefault(enabled) }
+    fun setAppLock(enabled: Boolean) = viewModelScope.launch { repo.setAppLock(enabled) }
     fun setTimerSeconds(seconds: Int) = viewModelScope.launch { repo.setTimerSeconds(seconds) }
     fun setFeatureFlag(id: String, enabled: Boolean) =
         viewModelScope.launch { repo.setFeatureFlag(id, enabled) }

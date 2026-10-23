@@ -48,8 +48,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 19
-        versionName = "1.10.0"
+        versionCode = 20
+        versionName = "1.11.0"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -150,6 +150,11 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     // Settings persistence (App Factory Rule 4: every setting persists and applies now)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // App lock. BiometricPrompt needs a FragmentActivity, so MainActivity extends one;
+    // fragment-ktx is not a dependency of activity-compose, hence it is named here.
+    implementation("androidx.fragment:fragment-ktx:1.8.3")
+    implementation("androidx.biometric:biometric:1.1.0")
 
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")

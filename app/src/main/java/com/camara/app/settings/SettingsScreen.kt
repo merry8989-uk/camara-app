@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.camara.app.BuildConfig
 import com.camara.app.diagnostics.DiagnosticsSection
+import androidx.compose.runtime.remember
+import com.camara.app.security.AppLock
 import com.camara.app.updater.UpdateUiState
 import com.camara.app.updater.UpdateViewModel
 
@@ -169,6 +171,24 @@ fun SettingsScreen(
                 checked = state.gridByDefault,
                 onChange = vm::setGridByDefault,
             )
+
+            // Only offered when the device can actually authenticate. A toggle that does
+            // nothing is worse than an explanation.
+            val lockAvailable = remember { AppLock.isAvailable(context) }
+            if (lockAvailable) {
+                ToggleRow(
+                    title = "App lock",
+                    subtitle = "Ask for your fingerprint or device PIN before showing anything",
+                    checked = state.appLockEnabled,
+                    onChange = vm::setAppLock,
+                )
+            } else {
+                Text(
+                    "App lock needs a fingerprint or a screen lock set up on this device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             Text("Default timer")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

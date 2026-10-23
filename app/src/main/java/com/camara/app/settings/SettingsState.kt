@@ -15,6 +15,8 @@ data class SettingsState(
     val mirrorSelfie: Boolean = true,
     val gridByDefault: Boolean = false,
     val timerSeconds: Int = 0,
+    /** Ask for the device biometric or PIN before showing anything. Off unless asked for. */
+    val appLockEnabled: Boolean = false,
     /** Per-feature on/off switches, persisted individually. */
     val featureFlags: Map<String, Boolean> = FeatureFlag.defaults(),
 ) {

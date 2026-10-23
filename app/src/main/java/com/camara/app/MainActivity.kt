@@ -1,7 +1,6 @@
 package com.camara.app
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
@@ -11,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.fragment.app.FragmentActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -21,7 +21,9 @@ import com.camara.app.settings.ThemeMode
 import com.camara.app.ui.navigation.CamaraRoot
 import com.camara.app.ui.theme.CamaraTheme
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity rather than ComponentActivity: androidx.biometric's BiometricPrompt
+// requires one, and the app lock needs it.
+class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

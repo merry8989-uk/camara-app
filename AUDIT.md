@@ -89,7 +89,8 @@ Worked in priority order, one commit per group, each verified by a CI build.
   `RgbMatrix` is evaluated per frame, so a real time-varying fade needs no custom shader.
 - **Step 12 (distribution):** a Play-ready App Bundle. ✅ v1.10.0 — a `play` flavour that
   drops the self-updater and the install-packages permission, plus `PLAY.md`.
-- **Step 13 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
+- **Step 13 (feature):** an app lock on the device biometric or PIN. ✅ v1.11.0
+- **Step 14 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
   shader); reverse; beauty and lenses into the recording; direct share targets.
 
 Each step ends with a signed release so the fixes are installable.
