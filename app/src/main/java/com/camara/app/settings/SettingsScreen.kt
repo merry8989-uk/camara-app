@@ -292,6 +292,8 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
         }
+
+        ExploreMoreAppsSection()
     }
 }
 
