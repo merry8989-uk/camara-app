@@ -54,7 +54,10 @@ is the only copy outside the repository secret — keep it somewhere safe either
 ## Checklist before an upload
 
 1. `versionCode` must be higher than the last upload. It lives in `app/build.gradle.kts`.
-2. `targetSdk` must meet Play's current requirement (34 at the time of writing).
+2. `targetSdk` must meet Play's current requirement. **It currently does not**: the app
+   targets 34, and Play has required API 35 for new apps and updates since August 2025.
+   Bumping it is not just a number — Android 15 enforces edge-to-edge, and several screens
+   assume the framework lays out the system bars. Test before uploading.
 3. Download `camara-<version>.aab` from the release, or build it:
    `./gradlew bundlePlayRelease` with the keystore environment variables set.
 4. Upload it in the Play Console, fill in the store listing, and complete the data safety

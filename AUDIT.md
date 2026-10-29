@@ -33,6 +33,35 @@ silently producing an unsigned APK.
 
 ---
 
+## Second pass — audit at v1.11.0
+
+A second read of the source, this time prompted by a report that the preview looks blurred
+and the filter chips look blank. Everything below comes from the code and the shipped
+binary, not from the screenshots — see "What is *not* a bug" for why the screenshots
+themselves are inconclusive.
+
+| # | Sev | Where | Problem |
+| --- | --- | --- | --- |
+| 19 | 🔴 P0 | `filters/LiveFilterEffect.kt` | Live skin smoothing blurs the **whole preview**. A `RenderEffect` on a `View` cannot be masked to a face, so the blur lands on every pixel. The saved photo *is* masked (`FaceBeauty`), so the preview and the result disagree. |
+| 20 | 🔴 P0 | `filters/LiveFilterEffect.kt` | Below API 31 the function does nothing at all, and there is no other live mechanism in the app — no `CameraEffect`, no GL surface. On Android 7–11 the preview is always unfiltered while the capture is filtered, silently. |
+| 21 | 🟠 P1 | `beauty/FaceBeauty.kt` | When no face is found, beauty is applied to the **whole frame** instead of not at all. "Beauty on the face only" becomes "beauty everywhere" exactly when detection is least reliable. |
+| 22 | 🟠 P1 | `util/Blur.kt`, `portrait/PortraitBokeh.kt` | `Blur.blur` allocates three full-size `IntArray`s plus the blurred bitmap. On a 12 MP photo that is about 190 MB in one go — an OOM on a 2 GB device. |
+| 23 | 🟡 P2 | `util/Permissions.kt` | Android 14 partial media access is unhandled: no `READ_MEDIA_VISUAL_USER_SELECTED`, so a user who picks "Select photos" gets a partial gallery with no explanation and no way to widen it. |
+| 24 | 🟡 P2 | `app/build.gradle.kts` | `targetSdk = 34`. Play has required API 35 for new apps and updates since August 2025, so this bundle would be refused. `PLAY.md` claimed 34 was fine — that was wrong, and is corrected there. |
+| 25 | 🟡 P2 | `SettingsScreen`, `CamaraRoot` | App-lock availability is cached once per process (`remember { AppLock.isAvailable(...) }`). Set up a PIN while the app is running and neither the toggle nor the gate appears until a restart. |
+| 26 | 🔵 P3 | `filters/UserFilterStore.kt` | `load()` reads and parses JSON on the main thread at startup — small, but it is file I/O inside composition. |
+
+### What is *not* a bug
+
+The screenshots show grey filter chips. They are dated before v1.5.2 — the release that
+replaced the gradient swatch with a real photo — and the bundled `filter_sample.jpg` is
+present in the shipped APK's resource table. The chips in the current build are very
+likely fine, so no fix is claimed for something that is probably already fixed.
+
+The blurred preview is different: **#19 explains it, and #19 is real.**
+
+---
+
 ## Findings
 
 ### 🔴 P0 — real bugs (wrong behaviour or crashes)
