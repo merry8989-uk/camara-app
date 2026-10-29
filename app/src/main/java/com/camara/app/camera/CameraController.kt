@@ -95,6 +95,10 @@ class CameraController(private val context: Context) {
     // Layers handed to the UI but not yet certainly finished with. See publishLayer.
     private val recentLayers = ArrayDeque<Bitmap?>()
 
+    /** Whether an analyzer is currently attached. Tracked here rather than asked of
+     *  CameraX, whose accessor is not available on every version we build against. */
+    private var analyzerAttached = false
+
     private companion object {
         /** How many recent face layers to keep alive before releasing the oldest. */
         const val LAYER_HOLD = 3
@@ -131,6 +135,7 @@ class CameraController(private val context: Context) {
      * aren't analysed (and the model isn't run) when nothing needs them.
      */
     private fun attachAnalyzer(analysis: ImageAnalysis) {
+        analyzerAttached = true
         analysis.setAnalyzer(
             analysisExecutor,
             FaceAnalyzer(
@@ -173,10 +178,11 @@ class CameraController(private val context: Context) {
         val analysis = imageAnalysis ?: return
         if (!lensesSupported) return
         val needed = lensesEnabled || liveLook() != null
-        if (needed && analysis.analyzer == null) {
+        if (needed && !analyzerAttached) {
             attachAnalyzer(analysis)
-        } else if (!needed && analysis.analyzer != null) {
+        } else if (!needed && analyzerAttached) {
             analysis.clearAnalyzer()
+            analyzerAttached = false
             publishLayer(null)
             faceState = null
         }
@@ -188,6 +194,8 @@ class CameraController(private val context: Context) {
         val view = previewView ?: return
         try {
             p.unbindAll()
+            // unbindAll detaches any analyzer along with the use cases.
+            analyzerAttached = false
 
             val baseSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
             val selector = CameraExtensionResolver.resolve(context, p, baseSelector, extension)
