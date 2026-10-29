@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -69,10 +70,18 @@ fun SettingsScreen(
     val state by vm.state.collectAsState()
     val context = LocalContext.current
 
+    // A Surface, not a Column with .background(). Painting a background does NOT set
+    // LocalContentColor, so every Text and Icon without an explicit colour fell back to
+    // Compose's default content colour — which is black. On a light background that is
+    // invisible as a bug; on this dark background it made the whole screen unreadable.
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
     ) {
         Row(
@@ -294,6 +303,7 @@ fun SettingsScreen(
         }
 
         ExploreMoreAppsSection()
+    }
     }
 }
 

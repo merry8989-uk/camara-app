@@ -50,6 +50,7 @@ themselves are inconclusive.
 | 24 | 🟡 P2 | `app/build.gradle.kts` | `targetSdk = 34`. Play has required API 35 for new apps and updates since August 2025, so this bundle would be refused. `PLAY.md` claimed 34 was fine — that was wrong, and is corrected there. |
 | 25 | 🟡 P2 | `SettingsScreen`, `CamaraRoot` | App-lock availability is cached once per process (`remember { AppLock.isAvailable(...) }`). Set up a PIN while the app is running and neither the toggle nor the gate appears until a restart. |
 | 26 | 🔵 P3 | `filters/UserFilterStore.kt` | `load()` reads and parses JSON on the main thread at startup — small, but it is file I/O inside composition. |
+| 27 | 🔴 P0 | `settings/SettingsScreen.kt` | The root was a `Column` with `.background(...)`. Painting a background does **not** set `LocalContentColor`, so every `Text` and `Icon` without an explicit colour fell back to Compose's default — **black**. Fine on a light background, invisible on a dark one: the whole Settings screen was unreadable in dark theme. **fixed** (v1.12.1: a real `Surface`, plus `LocalContentColor` provided at the theme level so a forgotten `Surface` can never hide a screen again). |
 
 ### What is *not* a bug
 
@@ -121,7 +122,8 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 13 (feature):** an app lock on the device biometric or PIN. ✅ v1.11.0
 - **Step 14 (feature):** a live face-tracking engine, face-only live effects, and
   natural-looking face stickers. ✅ v1.12.0 — see below.
-- **Step 15 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
+- **Step 15 (fix):** Settings was unreadable in dark theme. ✅ v1.12.1 — see #27.
+- **Step 16 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
   shader); reverse; beauty and lenses into the recording; direct share targets.
 
 ### Step 14 in detail

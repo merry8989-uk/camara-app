@@ -48,8 +48,8 @@ android {
         applicationId = "com.camara.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 21
-        versionName = "1.12.0"
+        versionCode = 22
+        versionName = "1.12.1"
 
         vectorDrawables { useSupportLibrary = true }
 

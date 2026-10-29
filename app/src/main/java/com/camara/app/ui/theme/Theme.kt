@@ -1,10 +1,12 @@
 package com.camara.app.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 
 private fun darkScheme(accent: Color) = darkColorScheme(
@@ -48,9 +50,20 @@ fun CamaraTheme(
     accent: Color = Accent,
     content: @Composable () -> Unit
 ) {
+    val scheme = if (darkTheme) darkScheme(accent) else lightScheme(accent)
+
     MaterialTheme(
-        colorScheme = if (darkTheme) darkScheme(accent) else lightScheme(accent),
+        colorScheme = scheme,
         typography = CamaraTypography,
-        content = content
-    )
+    ) {
+        // Safety net. Material3 does not set LocalContentColor at the theme level — only
+        // Surface and friends do — so a screen that paints a background without wrapping
+        // itself in a Surface inherits Compose's default, which is BLACK. On a light
+        // background that goes unnoticed; on a dark one the text disappears entirely,
+        // which is exactly what happened to Settings. Providing it here means a forgotten
+        // Surface degrades to readable text instead of an invisible screen.
+        CompositionLocalProvider(LocalContentColor provides scheme.onBackground) {
+            content()
+        }
+    }
 }

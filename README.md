@@ -336,6 +336,7 @@ That single matrix is reused everywhere:
 - [x] Play-ready App Bundle (a `play` flavour with the self-updater removed)
 - [x] Save your own filters (the look on screen, kept in a "Mine" tab)
 - [x] App lock — fingerprint or device PIN
+- [x] Dark theme readable everywhere (Settings text was black on black)
 - [ ] Direct share targets for specific social apps
 
 See [`PLAY.md`](PLAY.md) for how the Play bundle is built and signed.
