@@ -16,8 +16,9 @@ class FaceGeometryTest {
     @Test
     fun `the box is centred on the face`() {
         val box = FaceGeometry.faceBox(face(0.5f, 0.5f, 0.4f, 0.5f), 400, 600, expand = 0f)
-        assertEquals(160f, box.left, 0.01f)    // (0.5 - 0.2) * 400
-        assertEquals(240f, box.right, 0.01f)
+        // half width = 0.4 * 400 * 0.5 = 80, centred on 200.
+        assertEquals(120f, box.left, 0.01f)
+        assertEquals(280f, box.right, 0.01f)
         assertEquals(150f, box.top, 0.01f)     // (0.5 - 0.25) * 600
         assertEquals(450f, box.bottom, 0.01f)
     }
