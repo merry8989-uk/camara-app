@@ -327,6 +327,8 @@ That single matrix is reused everywhere:
 - [x] Stable signing so builds update in place
 - [x] Signing key moved to repository secrets (never committed)
 - [x] Unit tests for the filter maths, blur, undo history and frame fitting
+- [x] Live face-tracking engine (smoothed pose, dropout hold)
+- [x] Face-only live filter and smoothing, on every supported Android version
 - [ ] Beauty and AR lenses baked into the recorded video (needs per-frame face tracking)
 - [x] Multi-clip timeline — add, trim, reorder and join clips into one video
 - [x] Fade-to-black transitions between clips

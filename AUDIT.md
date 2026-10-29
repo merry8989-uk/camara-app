@@ -45,7 +45,7 @@ themselves are inconclusive.
 | 19 | 🔴 P0 | `filters/LiveFilterEffect.kt` | Live skin smoothing blurs the **whole preview**. A `RenderEffect` on a `View` cannot be masked to a face, so the blur lands on every pixel. The saved photo *is* masked (`FaceBeauty`), so the preview and the result disagree. |
 | 20 | 🔴 P0 | `filters/LiveFilterEffect.kt` | Below API 31 the function does nothing at all, and there is no other live mechanism in the app — no `CameraEffect`, no GL surface. On Android 7–11 the preview is always unfiltered while the capture is filtered, silently. |
 | 21 | 🟠 P1 | `beauty/FaceBeauty.kt` | When no face is found, beauty is applied to the **whole frame** instead of not at all. "Beauty on the face only" becomes "beauty everywhere" exactly when detection is least reliable. |
-| 22 | 🟠 P1 | `util/Blur.kt`, `portrait/PortraitBokeh.kt` | `Blur.blur` allocates three full-size `IntArray`s plus the blurred bitmap. On a 12 MP photo that is about 190 MB in one go — an OOM on a 2 GB device. |
+| 22 | — | `util/Blur.kt` | ~~`Blur.blur` allocates three full-size `IntArray`s.~~ **Not a bug — I was wrong.** `blur()` downscales by 0.25–0.6 *before* allocating, so a 12 MP photo blurs at ~1000×750. The 190 MB figure applies only to `boxBlur()` called at full resolution, which nothing does. |
 | 23 | 🟡 P2 | `util/Permissions.kt` | Android 14 partial media access is unhandled: no `READ_MEDIA_VISUAL_USER_SELECTED`, so a user who picks "Select photos" gets a partial gallery with no explanation and no way to widen it. |
 | 24 | 🟡 P2 | `app/build.gradle.kts` | `targetSdk = 34`. Play has required API 35 for new apps and updates since August 2025, so this bundle would be refused. `PLAY.md` claimed 34 was fine — that was wrong, and is corrected there. |
 | 25 | 🟡 P2 | `SettingsScreen`, `CamaraRoot` | App-lock availability is cached once per process (`remember { AppLock.isAvailable(...) }`). Set up a PIN while the app is running and neither the toggle nor the gate appears until a restart. |
@@ -119,7 +119,32 @@ Worked in priority order, one commit per group, each verified by a CI build.
 - **Step 12 (distribution):** a Play-ready App Bundle. ✅ v1.10.0 — a `play` flavour that
   drops the self-updater and the install-packages permission, plus `PLAY.md`.
 - **Step 13 (feature):** an app lock on the device biometric or PIN. ✅ v1.11.0
-- **Step 14 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
+- **Step 14 (feature):** a live face-tracking engine, face-only live effects, and
+  natural-looking face stickers. ✅ v1.12.0 — see below.
+- **Step 15 (feature):** crossfade (needs a time-varying *alpha*, i.e. a hand-written GL
   shader); reverse; beauty and lenses into the recording; direct share targets.
+
+### Step 14 in detail
+
+Fixes #19, #20 and #21 above.
+
+- `face/FaceTracker` — the tracking engine. Smooths the pose over time so stickers stop
+  shaking, holds the last pose through a short dropout so they stop blinking, and snaps
+  instead of gliding when the face really jumps. Pure logic, 16 tests.
+- `face/FaceGeometry` — where the face is in frame pixels, and the mask cache key. Pure,
+  10 tests.
+- `face/FaceCompositor` — applies the look through a feathered face mask on real pixels,
+  and returns a layer that is transparent everywhere the face is not. Because it works on
+  pixels rather than on the View, it also runs on **every** supported API level, not just
+  31+. That is what closes #20.
+- The camera draws that layer over the hardware preview, so the worst case is still a
+  normal preview with no effect — never a blank screen.
+- Analysis now runs at 480×640 RGBA_8888 with detection at ~8 fps; the tracker carries
+  the pose in between, which is what makes the whole thing affordable.
+- `FaceBeauty` no longer smears smoothing over the whole photo when no face is found: only
+  the colour grade is applied full-frame. A grade is defensible; a blur is not.
+- Face stickers: blush is a radial gradient fading to transparent instead of a flat dot,
+  glasses are gradient-tinted glass with a two-part sheen, and the moustache is shaded
+  hair rather than a flat grey shape.
 
 Each step ends with a signed release so the fixes are installable.

@@ -4,8 +4,10 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Size
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -15,6 +17,8 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCase
 import androidx.camera.core.ZoomState
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
@@ -38,6 +42,7 @@ import com.camara.app.filters.Filter
 import com.camara.app.filters.FilterPresets
 import com.camara.app.filters.LiveFilterEffect
 import com.camara.app.lenses.FaceAnalyzer
+import com.camara.app.lenses.FaceLook
 import com.camara.app.lenses.FaceState
 import androidx.compose.ui.geometry.Offset
 import com.camara.app.lenses.Lens
@@ -78,6 +83,23 @@ class CameraController(private val context: Context) {
     var lensesEnabled by mutableStateOf(false); private set
     var lensesSupported by mutableStateOf(true); private set
 
+    /**
+     * The face-only effect layer, drawn over the preview.
+     *
+     * Frame-sized with everything outside the face transparent, so the hardware preview
+     * shows through wherever this is blank. Null means "apply nothing" — which is also
+     * the safe fallback if compositing ever fails.
+     */
+    var faceLayer by mutableStateOf<Bitmap?>(null); private set
+
+    // Layers handed to the UI but not yet certainly finished with. See publishLayer.
+    private val recentLayers = ArrayDeque<Bitmap?>()
+
+    private companion object {
+        /** How many recent face layers to keep alive before releasing the oldest. */
+        const val LAYER_HOLD = 3
+    }
+
     private var provider: ProcessCameraProvider? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
@@ -109,10 +131,55 @@ class CameraController(private val context: Context) {
      * aren't analysed (and the model isn't run) when nothing needs them.
      */
     private fun attachAnalyzer(analysis: ImageAnalysis) {
-        analysis.setAnalyzer(analysisExecutor, FaceAnalyzer { face ->
-            // Hop to the main thread before writing Compose state.
-            executor.execute { if (lensesEnabled) faceState = face }
-        })
+        analysis.setAnalyzer(
+            analysisExecutor,
+            FaceAnalyzer(
+                look = { liveLook() },
+                onFace = { face ->
+                    // Hop to the main thread before writing Compose state.
+                    executor.execute { if (lensesEnabled) faceState = face }
+                },
+                onLayer = ::publishLayer
+            )
+        )
+    }
+
+    /** The look the live face compositor should apply, or null when there is none. */
+    private fun liveLook(): FaceLook? {
+        val look = FaceLook(filter, filterIntensity, beauty)
+        return if (look.isActive) look else null
+    }
+
+    /**
+     * Hands the newest face layer to the UI.
+     *
+     * The previous layers are kept for a couple of frames before being released: Compose
+     * may still be drawing the one it was last given, and recycling that under the canvas
+     * is a hard crash. Anything three frames old is certainly finished with.
+     */
+    private fun publishLayer(layer: Bitmap?) {
+        executor.execute {
+            recentLayers.add(layer)
+            faceLayer = layer
+            while (recentLayers.size > LAYER_HOLD) {
+                val oldest = recentLayers.removeAt(0)
+                if (oldest != null && oldest !== faceLayer) oldest.recycle()
+            }
+        }
+    }
+
+    /** Attaches the analyzer when either a lens or a live face effect needs frames. */
+    private fun syncAnalyzer() {
+        val analysis = imageAnalysis ?: return
+        if (!lensesSupported) return
+        val needed = lensesEnabled || liveLook() != null
+        if (needed && analysis.analyzer == null) {
+            attachAnalyzer(analysis)
+        } else if (!needed && analysis.analyzer != null) {
+            analysis.clearAnalyzer()
+            publishLayer(null)
+            faceState = null
+        }
     }
 
     private fun rebind() {
@@ -148,12 +215,24 @@ class CameraController(private val context: Context) {
                 .build()
             val vc = VideoCapture.withOutput(recorder)
 
-            val wantsAnalysis = lens?.art?.isNotEmpty() == true
+            // RGBA output and a small bound size on purpose: the face compositor needs
+            // real pixels every frame, and YUV conversion plus a full-resolution buffer
+            // would make that unaffordable. 480x640 is ample for detection and cheap to
+            // composite. The 4:3 bound keeps it matching the preview.
             val analysis = ImageAnalysis.Builder()
-                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(480, 640),
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                            )
+                        )
+                        .build()
+                )
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-            if (wantsAnalysis) attachAnalyzer(analysis)
 
             val useCases = mutableListOf<UseCase>(previewUseCase)
             when (mode) {
@@ -179,13 +258,18 @@ class CameraController(private val context: Context) {
             imageCapture = ic
             videoCapture = vc
             imageAnalysis = analysis
-            if (!wantsAnalysis || !lensesSupported) faceState = null
+            if (!lensesSupported) faceState = null
+            // Analysis is bound either way; whether an analyzer is attached depends on
+            // whether a lens or a live face effect actually needs frames.
+            syncAnalyzer()
 
             camera?.cameraInfo?.zoomState?.observe(owner) { state: ZoomState ->
                 maxZoom = state.maxZoomRatio
             }
             applyZoom()
-            LiveFilterEffect.apply(view, filter, filterIntensity, beauty)
+            // Colour only. The blur used to be applied to the whole view here, which
+            // blurred the entire preview instead of the face - see FaceCompositor.
+            LiveFilterEffect.applyColour(view, filter, filterIntensity, beauty)
         } catch (t: Throwable) {
             errorMessage = t.message ?: "Camera failed to bind"
         }
@@ -253,18 +337,16 @@ class CameraController(private val context: Context) {
     }
 
     fun applyLens(newLens: Lens) {
-        val wasActive = lensesEnabled
         lens = newLens
         lensesEnabled = newLens.art.isNotEmpty()
         if (!lensesEnabled) faceState = null
-        if (wasActive == lensesEnabled) return
 
         // Attach or detach the analyzer rather than rebinding: analysis is already bound,
-        // and a rebind would restart the preview for no reason.
-        val analysis = imageAnalysis
-        if (analysis != null && lensesSupported) {
-            if (lensesEnabled) attachAnalyzer(analysis) else analysis.clearAnalyzer()
-        } else {
+        // and a rebind would restart the preview for no reason. A live face effect needs
+        // frames too, so the decision is made in one place.
+        if (imageAnalysis != null && lensesSupported) {
+            syncAnalyzer()
+        } else if (lensesEnabled) {
             // Analysis isn't bound on this device — a rebind is the only way to try.
             rebind()
         }
@@ -282,7 +364,10 @@ class CameraController(private val context: Context) {
     }
 
     private fun refreshPreviewEffect() {
-        previewView?.let { LiveFilterEffect.apply(it, filter, filterIntensity, beauty) }
+        previewView?.let { LiveFilterEffect.applyColour(it, filter, filterIntensity, beauty) }
+        // Turning smoothing or a filter on is what starts the face compositor; turning
+        // them off is what stops it and its frames.
+        syncAnalyzer()
     }
 
     private fun applyZoom() {

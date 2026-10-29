@@ -19,6 +19,17 @@ import kotlin.math.min
  */
 object BeautyRenderer {
 
+    /**
+     * Only the colour grade — no smoothing, no warp, no sharpen.
+     *
+     * Used when there is no face to confine the spatial steps to: a colour grade over the
+     * whole frame is harmless, a full-frame blur is not.
+     */
+    fun applyGradeOnly(src: Bitmap, settings: BeautySettings): Bitmap {
+        if (!settings.hasGrade) return src
+        return applyMatrix(src, settings.gradeMatrix())
+    }
+
     fun apply(src: Bitmap, settings: BeautySettings): Bitmap {
         if (settings.isDefault) return src
 

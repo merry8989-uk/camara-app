@@ -3,8 +3,11 @@ package com.camara.app.lenses
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.RectF
 import androidx.compose.ui.geometry.Offset
 import kotlin.math.max
@@ -205,7 +208,18 @@ object LensRenderer {
         val lensW = w * 0.40f
         val lensH = if (round) w * 0.38f else w * 0.28f
         val gap = w * 0.07f
-        val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6101014.toInt() }
+        // Real glass is not one flat colour: it darkens at the top where it meets the
+        // brow, catches a little ambient blue in the middle and lifts at the bottom. A
+        // vertical gradient with a slight blue cast reads as a lens; a flat fill reads as
+        // a black shape pasted on the face.
+        val dark = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+            shader = LinearGradient(
+                0f, y - lensH / 2f, 0f, y + lensH / 2f,
+                intArrayOf(0xF20B0E14.toInt(), 0xE6121720.toInt(), 0xE6263040.toInt()),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
         val r = if (round) lensH / 2f else lensH * 0.28f
 
         val left = RectF(x - gap / 2f - lensW, y - lensH / 2f, x - gap / 2f, y + lensH / 2f)
@@ -239,8 +253,19 @@ object LensRenderer {
         }
         canvas.drawLine(x - gap / 2f, y, x + gap / 2f, y, bridge)
 
-        val glare = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x44FFFFFF }
+        // Two highlights rather than one: a broad soft sheen plus a tighter bright streak.
+        // The pair is what makes a lens look wet and reflective instead of matte.
+        val sheen = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+            shader = LinearGradient(
+                0f, y - lensH / 2f, 0f, y + lensH / 2f,
+                intArrayOf(0x40FFFFFF, 0x10FFFFFF, 0x00FFFFFF),
+                floatArrayOf(0f, 0.5f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        val glare = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x55FFFFFF }
         listOf(left, right).forEach { rect ->
+            canvas.drawRoundRect(rect, r, r, sheen)
             canvas.drawRoundRect(
                 RectF(
                     rect.left + rect.width() * 0.16f,
@@ -281,9 +306,18 @@ object LensRenderer {
     }
 
     private fun drawMustache(canvas: Canvas, x: Float, y: Float, w: Float) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2B2B33.toInt() }
         val half = w * 0.5f
         val h = w * 0.26f
+        // Hair is not one colour either — it catches light along the top and sits darker
+        // underneath. Warm brown with a dark core looks like hair; flat grey looks drawn.
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+            shader = LinearGradient(
+                0f, y - h, 0f, y + h * 0.55f,
+                intArrayOf(0xFF4A362B.toInt(), 0xFF241812.toInt(), 0xFF3A2A21.toInt()),
+                floatArrayOf(0f, 0.6f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
         canvas.drawPath(
             Path().apply {
                 moveTo(x, y)
@@ -303,10 +337,21 @@ object LensRenderer {
     }
 
     private fun drawBlush(canvas: Canvas, x: Float, y: Float, w: Float) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x55FF6B9D }
-        val r = w * 0.13f
-        canvas.drawCircle(x - w * 0.30f, y, r, paint)
-        canvas.drawCircle(x + w * 0.30f, y, r, paint)
+        // A flat translucent circle reads as a sticker dot. Blush is a soft pool of colour
+        // that fades to nothing at its edge, so it is drawn as a radial gradient with a
+        // transparent outer stop — the single biggest thing that makes it look natural.
+        val r = w * 0.21f
+        listOf(x - w * 0.30f, x + w * 0.30f).forEach { cx ->
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+                shader = RadialGradient(
+                    cx, y, r,
+                    intArrayOf(0x5CFF5C8A, 0x2EFF7FA8, 0x00FF9BBB),
+                    floatArrayOf(0f, 0.5f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawCircle(cx, y, r, paint)
+        }
     }
 
     private fun drawCrown(canvas: Canvas, x: Float, y: Float, w: Float) {

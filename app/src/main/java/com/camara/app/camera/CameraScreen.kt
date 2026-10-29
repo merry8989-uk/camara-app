@@ -84,6 +84,7 @@ import com.camara.app.settings.FeatureFlag
 import com.camara.app.settings.SettingsRepository
 import com.camara.app.settings.SettingsState
 import com.camara.app.editor.image.ImageEditState
+import com.camara.app.lenses.FaceLayerOverlay
 import com.camara.app.lenses.LensOverlay
 import com.camara.app.lenses.LensPicker
 import com.camara.app.lenses.LensRenderer
@@ -325,6 +326,14 @@ private fun CameraContent(
                         controller.setSubjectPoint(Offset(nx, ny))
                     }
                 }
+        )
+
+        // --- Live face-only effect layer (filter + smoothing on the face) ---
+        // Drawn under the lens so stickers and lens pieces stay crisp on top of it.
+        FaceLayerOverlay(
+            layer = controller.faceLayer,
+            mirrored = controller.lensFacing == CameraSelector.LENS_FACING_FRONT,
+            modifier = Modifier.fillMaxSize()
         )
 
         // --- AR lens overlay (under stickers) ---
